@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Craft Studio | تصميم وتطوير مواقع الويب</title>
+    <meta
+      name="description"
+      content="Web Craft Studio: استوديو متخصص في تصميم وتطوير مواقع الويب."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="header" id="top">
+      <div class="container nav">
+        <a href="#top" class="brand"
+          ><img class="mark-img" src="images/logo-mark.png" alt="" />Web Craft
+          Studio</a
+        >
+        <nav class="links" id="links">
+          <a href="#about">من نحن</a><a href="#services">الخدمات</a
+          ><a href="#projects">المشاريع</a><a href="#contact">تواصل</a>
+        </nav>
+        <button
+          class="icon-btn"
+          id="adminBtn"
+          title="دخول المدير"
+          aria-label="دخول المدير"
+        >
+          🔒
+        </button>
+        <button class="icon-btn menu" id="menuBtn" aria-label="القائمة">
+          ☰
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-in">
+          <h1>نصمم ونطوّر مواقع ويب<br />تعبّر عن نشاطك</h1>
+          <p>
+            Web Craft Studio استوديو متخصص في تصميم وتطوير مواقع الويب بواجهات
+            عصرية وأداء سريع.
+          </p>
+          <div class="cta">
+            <a class="btn" href="#projects">شاهد أعمالنا</a
+            ><a class="btn ghost" href="#contact">ابدأ مشروعك</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="about" class="section">
+        <div class="container about">
+          <div>
+            <h2>من نحن</h2>
+            <p>
+              نحن فريق متخصص في تصميم وتطوير مواقع الويب. نبدأ بفهم هدفك
+              وجمهورك، ثم نبني موقعًا واضحًا وسريعًا ويعمل بشكل ممتاز على
+              الموبايل والتابلت والكمبيوتر.
+            </p>
+          </div>
+          <img
+            src="images/about.jpg"
+            alt="تصميم وتطوير مواقع الويب"
+            loading="lazy"
+          />
+        </div>
+      </section>
+
+      <section id="services" class="section alt">
+        <div class="container">
+          <h2>الخدمات</h2>
+          <div class="grid">
+            <article class="card svc">
+              <span class="ico">🎨</span>
+              <h3>تصميم واجهات</h3>
+              <p>واجهات حديثة ومتناسقة مع هوية علامتك التجارية.</p>
+            </article>
+            <article class="card svc">
+              <span class="ico">💻</span>
+              <h3>تطوير مواقع</h3>
+              <p>مواقع سريعة ومتجاوبة مبنية بكود نظيف وسهل التطوير.</p>
+            </article>
+            <article class="card svc">
+              <span class="ico">✨</span>
+              <h3>تحسين تجربة المستخدم</h3>
+              <p>نجعل التنقل بسيطًا ونرفع نسبة التفاعل والتحويل.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="projects" class="section">
+        <div class="container">
+          <div class="row">
+            <h2>المشاريع</h2>
+            <button class="btn small" id="addBtn" hidden>+ إضافة مشروع</button>
+          </div>
+          <div class="grid" id="projectGrid"></div>
+        </div>
+      </section>
+
+      <section id="contact" class="section alt">
+        <div class="container">
+          <h2>تواصل معنا</h2>
+          <div class="grid">
+            <a
+              class="card contact"
+              href="https://www.facebook.com/profile.php?id=61594662582257"
+              target="_blank"
+              rel="noopener"
+              ><span class="ico">📘</span>
+              <h3>فيسبوك</h3>
+              <p>Web Craft Studio</p></a
+            >
+            <a class="card contact phone" href="tel:+201024370764"
+              ><span class="ico">📞</span>
+              <h3>الهاتف</h3>
+              <p dir="ltr">01024370764</p></a
+            >
+            <a
+              class="card contact wa"
+              href="https://wa.me/201024370764"
+              target="_blank"
+              rel="noopener"
+              ><span class="ico">💬</span>
+              <h3>واتساب</h3>
+              <p dir="ltr">01024370764</p></a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">© 2026 Web Craft Studio. جميع الحقوق محفوظة.</div>
+    </footer>
+
+    <div class="modal" id="modal" hidden>
+      <form class="box" id="form">
+        <h3>إضافة مشروع جديد</h3>
+        <label
+          >عنوان المشروع<input name="title" required maxlength="60"
+        /></label>
+        <label
+          >وصف قصير<textarea
+            name="desc"
+            required
+            maxlength="160"
+            rows="3"
+          ></textarea>
+        </label>
+        <label
+          >رابط المشروع (اختياري)<input
+            name="url"
+            type="url"
+            dir="ltr"
+            placeholder="https://"
+        /></label>
+        <label
+          >صورة المشروع<input name="img" type="file" accept="image/*" required
+        /></label>
+        <div class="row">
+          <button class="btn small" type="submit">حفظ</button
+          ><button class="btn small ghost dark" type="button" id="cancel">
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="modal" id="login" hidden>
+      <form class="box" id="loginForm">
+        <h3>دخول المدير</h3>
+        <label
+          >كلمة المرور<input
+            type="password"
+            id="pw"
+            autocomplete="current-password"
+            required
+        /></label>
+        <p class="err" id="pwErr" hidden>كلمة المرور غير صحيحة.</p>
+        <div class="row">
+          <button class="btn small" type="submit">دخول</button
+          ><button class="btn small ghost dark" type="button" id="loginCancel">
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+    <script src="script.js"></script>
+  </body>
+</html>
