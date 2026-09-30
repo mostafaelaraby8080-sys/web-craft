@@ -7,9 +7,13 @@ const http = require("http"),
 
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, "public");
-const DATA = process.env.DATA_DIR || path.join(__dirname, "data");
-const UPLOADS = path.join(DATA, "uploads");
-const DB = path.join(DATA, "projects.json");
+
+const isVercel = process.env.VERCEL || process.emv.AWS_LAMBDA_FUNCTION_VERSION;
+const baseDir = isVercel ? require("os").tmpdir() : __dirname;
+
+const DATA = path.join(baseDir, "data");
+const UPLOADS = path.join(baseDir, "data", "uploads");
+const DB = path.join(baseDir, "data", "database.json");
 fs.mkdirSync(UPLOADS, { recursive: true });
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "webcraft2026";
