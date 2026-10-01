@@ -5,10 +5,30 @@
   --brand: #2f7bff;
   --accent: #7a5cff;
   --bg: #f5f7fc;
+  --surface-alt: #eaeffb;
   --card: #fff;
   --text: #161f33;
   --muted: #5d6b82;
+  --header-bg: rgba(13, 27, 46, 0.92);
+  --field-bg: #fff;
+  --icon-bg: #e6efff;
+  --shadow: 0 6px 20px rgba(13, 27, 46, 0.07);
   --r: 16px;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --ink: #050914;
+  --ink2: #0b1224;
+  --bg: #0a1020;
+  --surface-alt: #101a30;
+  --card: #121d33;
+  --text: #eef3ff;
+  --muted: #a5b2cb;
+  --header-bg: rgba(5, 9, 20, 0.88);
+  --field-bg: #0b1427;
+  --icon-bg: #202c4b;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+  color-scheme: dark;
 }
 * {
   box-sizing: border-box;
@@ -23,6 +43,7 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.8;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 .container {
   width: min(1100px, 92%);
@@ -36,9 +57,10 @@ a {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(13, 27, 46, 0.92);
+  background: var(--header-bg);
   backdrop-filter: blur(8px);
   color: #fff;
+  transition: background-color 0.35s ease, box-shadow 0.35s ease;
 }
 .nav {
   display: flex;
@@ -89,13 +111,19 @@ a {
 .icon-btn:hover,
 .icon-btn.on {
   background: var(--accent);
-  color: var(--ink);
+  color: #fff;
   border-color: var(--accent);
+}
+.theme-btn {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 .menu {
   display: none;
 }
 .hero {
+  position: relative;
+  isolation: isolate;
   background:
     linear-gradient(
       90deg,
@@ -107,6 +135,36 @@ a {
     var(--ink);
   color: #fff;
   padding: 110px 0 120px;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: min(48vw, 560px);
+  aspect-ratio: 1;
+  inset-block-start: -42%;
+  inset-inline-start: 8%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(122, 92, 255, 0.34),
+    rgba(47, 123, 255, 0.12) 42%,
+    transparent 70%
+  );
+  filter: blur(12px);
+  animation: aurora 12s ease-in-out infinite alternate;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: 0.13;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.72) 0.7px, transparent 0.7px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(90deg, transparent, #000 65%);
+  pointer-events: none;
 }
 .hero h1 {
   font-size: clamp(2rem, 5.5vw, 3.6rem);
@@ -131,6 +189,14 @@ a {
   from {
     opacity: 0;
     transform: translateY(24px);
+  }
+  @keyframes aurora {
+    from {
+      transform: translate3d(-8%, 5%, 0) scale(0.9);
+    }
+    to {
+      transform: translate3d(15%, 28%, 0) scale(1.2);
+    }
   }
   to {
     opacity: 1;
@@ -168,7 +234,8 @@ a {
   padding: 80px 0;
 }
 .alt {
-  background: #eaeffb;
+  background: var(--surface-alt);
+  transition: background-color 0.35s ease;
 }
 h2 {
   font-size: 2rem;
@@ -204,8 +271,9 @@ h2::after {
 .card {
   background: var(--card);
   border-radius: var(--r);
-  box-shadow: 0 6px 20px rgba(13, 27, 46, 0.07);
-  transition: 0.3s;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.35s ease,
+    color 0.35s ease;
   overflow: hidden;
 }
 .card:hover {
@@ -222,7 +290,7 @@ h2::after {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: #e6efff;
+  background: var(--icon-bg);
   font-size: 1.5rem;
   margin-bottom: 1rem;
 }
@@ -275,6 +343,15 @@ h2::after {
   text-align: center;
   padding: 1.6rem 0;
 }
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
 .modal {
   position: fixed;
   inset: 0;
@@ -288,7 +365,8 @@ h2::after {
   display: none;
 }
 .box {
-  background: #fff;
+  background: var(--card);
+  color: var(--text);
   border-radius: var(--r);
   padding: 1.6rem;
   width: min(440px, 100%);
@@ -308,6 +386,12 @@ h2::after {
   padding: 0.55rem 0.7rem;
   border: 1px solid #cfd8e8;
   border-radius: 10px;
+  background: var(--field-bg);
+  color: var(--text);
+}
+:root[data-theme="dark"] .box input,
+:root[data-theme="dark"] .box textarea {
+  border-color: #33425f;
 }
 .box input:focus,
 .box textarea:focus {
@@ -374,6 +458,20 @@ h2::after {
 }
 #contact .card {
   color: var(--text);
+}
+:root[data-theme="dark"] #contact .card {
+  background: rgba(18, 29, 51, 0.94);
+  backdrop-filter: blur(10px);
+}
+:root[data-theme="dark"] .about img {
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
+}
+:root[data-theme="dark"] .btn.ghost.dark {
+  border-color: #445371;
+  color: var(--text);
+}
+:root[data-theme="dark"] .wa .ico {
+  background: #123e35;
 }
 @media (max-width: 720px) {
   .about {

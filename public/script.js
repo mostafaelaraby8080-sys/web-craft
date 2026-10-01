@@ -1,6 +1,7 @@
 "use strict";
 // النسخة المرتبطة بالـ Backend: المشاريع وتسجيل الدخول عبر /api
 const TOKEN_KEY = "wcs_token";
+const THEME_KEY = "wcs_theme";
 const $ = (s) => document.querySelector(s);
 const grid = $("#projectGrid"),
   modal = $("#modal"),
@@ -15,6 +16,28 @@ try {
   token = sessionStorage.getItem(TOKEN_KEY);
 } catch (e) {}
 let admin = !!token;
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const button = $("#themeBtn");
+  const dark = theme === "dark";
+  button.textContent = dark ? "☀" : "☾";
+  button.setAttribute(
+    "aria-label",
+    dark ? "تفعيل الوضع النهاري" : "تفعيل الوضع الليلي",
+  );
+  button.title = dark ? "تفعيل الوضع النهاري" : "تفعيل الوضع الليلي";
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch (e) {}
+}
+
+$("#themeBtn").onclick = () => {
+  const next =
+    document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(next);
+};
+applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 
 function toast(msg) {
   const t = $("#toast");
@@ -66,6 +89,35 @@ function render() {
     </article>`,
     )
     .join("");
+  observeReveals(grid.querySelectorAll(".proj"));
+}
+
+let revealObserver;
+function observeReveals(elements) {
+  if (!elements) {
+    elements = document.querySelectorAll("main section, .svc, .contact");
+    elements.forEach((element) => element.classList.add("reveal"));
+  }
+  if (
+    !("IntersectionObserver" in window) ||
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    elements.forEach((element) => element.classList.add("is-visible"));
+    return;
+  }
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver(
+      (entries, observer) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.12 },
+    );
+  }
+  elements.forEach((element) => revealObserver.observe(element));
 }
 
 async function loadProjects() {
@@ -221,4 +273,5 @@ $(".phone").onclick = (e) => {
 };
 
 setAdmin(admin, token);
+observeReveals();
 loadProjects();

@@ -15,6 +15,16 @@
       rel="stylesheet"
     />
     <link rel="icon" href="images/favicon.png" />
+    <script>
+      try {
+        const savedTheme = localStorage.getItem("wcs_theme");
+        const systemDark = matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme =
+          savedTheme || (systemDark ? "dark" : "light");
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -28,6 +38,15 @@
           <a href="#about">من نحن</a><a href="#services">الخدمات</a
           ><a href="#projects">المشاريع</a><a href="#contact">تواصل</a>
         </nav>
+        <button
+          class="icon-btn theme-btn"
+          id="themeBtn"
+          type="button"
+          aria-label="تفعيل الوضع الليلي"
+          title="تفعيل الوضع الليلي"
+        >
+          ☾
+        </button>
         <button
           class="icon-btn"
           id="adminBtn"
