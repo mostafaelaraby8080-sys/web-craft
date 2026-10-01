@@ -12,6 +12,9 @@
   --header-bg: rgba(13, 27, 46, 0.92);
   --field-bg: #fff;
   --icon-bg: #e6efff;
+  --rgb-blue: rgba(47, 123, 255, 0.16);
+  --rgb-violet: rgba(122, 92, 255, 0.13);
+  --rgb-pink: rgba(255, 93, 177, 0.1);
   --shadow: 0 6px 20px rgba(13, 27, 46, 0.07);
   --r: 16px;
   color-scheme: light;
@@ -27,6 +30,9 @@
   --header-bg: rgba(5, 9, 20, 0.88);
   --field-bg: #0b1427;
   --icon-bg: #202c4b;
+  --rgb-blue: rgba(47, 123, 255, 0.24);
+  --rgb-violet: rgba(122, 92, 255, 0.2);
+  --rgb-pink: rgba(255, 67, 166, 0.15);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
   color-scheme: dark;
 }
@@ -190,17 +196,26 @@ a {
     opacity: 0;
     transform: translateY(24px);
   }
-  @keyframes aurora {
-    from {
-      transform: translate3d(-8%, 5%, 0) scale(0.9);
-    }
-    to {
-      transform: translate3d(15%, 28%, 0) scale(1.2);
-    }
-  }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes aurora {
+  from {
+    transform: translate3d(-8%, 5%, 0) scale(0.9);
+  }
+  to {
+    transform: translate3d(15%, 28%, 0) scale(1.2);
+  }
+}
+@keyframes rgb-flow {
+  0%,
+  100% {
+    background-position: 0% 50%, 100% 50%, 50% 100%;
+  }
+  50% {
+    background-position: 100% 50%, 0% 50%, 50% 0%;
   }
 }
 .btn {
@@ -232,10 +247,17 @@ a {
 }
 .section {
   padding: 80px 0;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 12% 18%, var(--rgb-blue), transparent 58%),
+    radial-gradient(ellipse at 88% 72%, var(--rgb-violet), transparent 56%),
+    radial-gradient(ellipse at 52% 110%, var(--rgb-pink), transparent 52%);
+  background-size: 180% 180%, 160% 160%, 170% 170%;
+  animation: rgb-flow 24s ease-in-out infinite;
+  transition: background-color 0.35s ease;
 }
 .alt {
-  background: var(--surface-alt);
-  transition: background-color 0.35s ease;
+  background-color: var(--surface-alt);
 }
 h2 {
   font-size: 2rem;
@@ -339,6 +361,11 @@ h2::after {
 }
 .footer {
   background: var(--ink);
+  background-image:
+    radial-gradient(ellipse at 12% 100%, var(--rgb-blue), transparent 46%),
+    radial-gradient(ellipse at 88% 0%, var(--rgb-violet), transparent 48%);
+  background-size: 160% 160%, 160% 160%;
+  animation: rgb-flow 28s ease-in-out infinite;
   color: #9fb0cc;
   text-align: center;
   padding: 1.6rem 0;
