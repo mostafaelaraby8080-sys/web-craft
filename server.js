@@ -297,22 +297,28 @@ async function api(req, res, url) {
   send(res, 404, { error: "غير موجود" });
 }
 
-http
-  .createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url, "http://x");
-      if (url.pathname.startsWith("/api/")) return await api(req, res, url);
-      if (url.pathname.startsWith("/uploads/"))
-        return serveFile(res, UPLOADS, url.pathname.slice(9));
-      serveFile(
-        res,
-        PUB,
-        url.pathname === "/" ? "index.html" : url.pathname.slice(1),
-      );
-    } catch (e) {
-      send(res, 400, { error: e.message || "خطأ" });
-    }
-  })
-  .listen(PORT, () =>
-    console.log("Web Craft Studio: http://localhost:" + PORT),
-  );
+async function requestHandler(req, res) {
+  try {
+    const url = new URL(req.url, "http://x");
+    if (url.pathname.startsWith("/api/")) return await api(req, res, url);
+    if (url.pathname.startsWith("/uploads/"))
+      return serveFile(res, UPLOADS, url.pathname.slice(9));
+    serveFile(
+      res,
+      PUB,
+      url.pathname === "/" ? "index.html" : url.pathname.slice(1),
+    );
+  } catch (e) {
+    send(res, 400, { error: e.message || "خطأ" });
+  }
+}
+
+module.exports = requestHandler;
+
+if (require.main === module) {
+  http
+    .createServer(requestHandler)
+    .listen(PORT, () =>
+      console.log("Web Craft Studio: http://localhost:" + PORT),
+    );
+}

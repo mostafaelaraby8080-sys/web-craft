@@ -39,3 +39,7 @@
 للنشر على Vercel أو AWS Lambda اضبط `MONGODB_URI` وبيانات Cloudinary في متغيرات
 البيئة. عندها تُحفظ بيانات المشاريع في MongoDB Atlas والصور في Cloudinary، ولا
 يعتمد التطبيق على القرص المؤقت. لا تضع هذه القيم داخل GitHub.
+
+ملف `vercel.json` يوجّه الطلبات إلى دالة Vercel serverless، لذلك بعد ربط
+المستودع بـ Vercel يجب إعادة النشر (Redeploy) وإضافة متغيرات البيئة في إعدادات
+المشروع.
