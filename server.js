@@ -3,7 +3,8 @@
 const http = require("http"),
   fs = require("fs"),
   path = require("path"),
-  crypto = require("crypto");
+  crypto = require("crypto"),
+  os = require("os");
 
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, "public");
@@ -15,27 +16,18 @@ const isServerless = Boolean(
   process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION,
 );
 const DATA = path.resolve(
-  process.env.DATA_DIR || path.join(__dirname, "data"),
+  process.env.DATA_DIR ||
+    path.join(isServerless ? os.tmpdir() : __dirname, "data"),
 );
 const UPLOADS = path.join(DATA, "uploads");
 const DB = path.join(DATA, "database.json");
 fs.mkdirSync(UPLOADS, { recursive: true });
 
-if (isServerless && !process.env.DATA_DIR) {
-  console.warn(
-    "⚠ بيئة serverless تستخدم تخزينًا مؤقتًا. اضبط DATA_DIR على قرص دائم أو استخدم قاعدة بيانات خارجية حتى لا تختفي المشاريع بعد إعادة التشغيل.",
-  );
-}
-if (useMongo) {
-  if (
-    !process.env.CLOUDINARY_CLOUD_NAME ||
-    !process.env.CLOUDINARY_API_KEY ||
-    !process.env.CLOUDINARY_API_SECRET
-  ) {
-    throw new Error(
-      "يلزم ضبط CLOUDINARY_CLOUD_NAME وCLOUDINARY_API_KEY وCLOUDINARY_API_SECRET مع MONGODB_URI.",
-    );
-  }
+const hasCloudinary =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET;
+if (useMongo && hasCloudinary) {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -48,15 +40,20 @@ const PASSWORD = process.env.ADMIN_PASSWORD || "webcraft2026";
 if (!process.env.ADMIN_PASSWORD)
   console.warn("⚠ استخدم متغير ADMIN_PASSWORD لتغيير كلمة المرور الافتراضية.");
 
-// مفتاح توقيع الجلسات: من متغير SECRET أو يُولَّد ويُحفظ مرة واحدة
+// On serverless, keep a fallback secret in memory; configure SECRET to keep
+// login tokens valid across separate function instances.
 const keyFile = path.join(DATA, "secret.key");
 let SECRET = process.env.SECRET;
 if (!SECRET) {
-  try {
-    SECRET = fs.readFileSync(keyFile, "utf8");
-  } catch {
+  if (isServerless) {
     SECRET = crypto.randomBytes(32).toString("hex");
-    fs.writeFileSync(keyFile, SECRET, { mode: 0o600 });
+  } else {
+    try {
+      SECRET = fs.readFileSync(keyFile, "utf8");
+    } catch {
+      SECRET = crypto.randomBytes(32).toString("hex");
+      fs.writeFileSync(keyFile, SECRET, { mode: 0o600 });
+    }
   }
 }
 
@@ -127,6 +124,9 @@ const writeDB = async (list) => {
   fs.renameSync(t, DB);
 };
 async function uploadImage(dataUri) {
+  if (useMongo && !hasCloudinary) {
+    throw new Error("إعداد Cloudinary غير مكتمل في متغيرات بيئة النشر.");
+  }
   if (!useMongo) {
     const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(
       dataUri,
