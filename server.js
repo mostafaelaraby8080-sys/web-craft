@@ -7,14 +7,42 @@ const http = require("http"),
 
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, "public");
+const useMongo = Boolean(process.env.MONGODB_URI);
+const cloudinary = useMongo ? require("cloudinary").v2 : null;
+const { MongoClient } = useMongo ? require("mongodb") : { MongoClient: null };
 
-const isVercel = process.env.VERCEL || process.emv.AWS_LAMBDA_FUNCTION_VERSION;
-const baseDir = isVercel ? require("os").tmpdir() : __dirname;
-
-const DATA = path.join(baseDir, "data");
-const UPLOADS = path.join(baseDir, "data", "uploads");
-const DB = path.join(baseDir, "data", "database.json");
+const isServerless = Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION,
+);
+const DATA = path.resolve(
+  process.env.DATA_DIR || path.join(__dirname, "data"),
+);
+const UPLOADS = path.join(DATA, "uploads");
+const DB = path.join(DATA, "database.json");
 fs.mkdirSync(UPLOADS, { recursive: true });
+
+if (isServerless && !process.env.DATA_DIR) {
+  console.warn(
+    "⚠ بيئة serverless تستخدم تخزينًا مؤقتًا. اضبط DATA_DIR على قرص دائم أو استخدم قاعدة بيانات خارجية حتى لا تختفي المشاريع بعد إعادة التشغيل.",
+  );
+}
+if (useMongo) {
+  if (
+    !process.env.CLOUDINARY_CLOUD_NAME ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_API_SECRET
+  ) {
+    throw new Error(
+      "يلزم ضبط CLOUDINARY_CLOUD_NAME وCLOUDINARY_API_KEY وCLOUDINARY_API_SECRET مع MONGODB_URI.",
+    );
+  }
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
+  });
+}
 
 const PASSWORD = process.env.ADMIN_PASSWORD || "webcraft2026";
 if (!process.env.ADMIN_PASSWORD)
@@ -56,18 +84,70 @@ const SEED = [
     seed: true,
   },
 ];
+let mongoClient;
+let projectsCollection;
+async function getMongoCollection() {
+  if (!useMongo) return null;
+  if (!projectsCollection) {
+    mongoClient = new MongoClient(process.env.MONGODB_URI);
+    await mongoClient.connect();
+    projectsCollection = mongoClient
+      .db(process.env.MONGODB_DB || "webcraft")
+      .collection("projects");
+    await projectsCollection.createIndex({ id: 1 }, { unique: true });
+  }
+  return projectsCollection;
+}
 const readDB = () => {
+  if (useMongo)
+    return getMongoCollection().then(async (collection) => {
+      const projects = await collection
+        .find({}, { projection: { _id: 0 } })
+        .sort({ createdAt: -1 })
+        .toArray();
+      if (projects.length) return projects;
+      await collection.insertMany(SEED);
+      return SEED.slice();
+    });
   try {
     return JSON.parse(fs.readFileSync(DB, "utf8"));
   } catch {
     return SEED.slice();
   }
 };
-const writeDB = (list) => {
+const writeDB = async (list) => {
+  if (useMongo) {
+    const collection = await getMongoCollection();
+    await collection.deleteMany({});
+    if (list.length) await collection.insertMany(list);
+    return;
+  }
   const t = DB + ".tmp";
   fs.writeFileSync(t, JSON.stringify(list, null, 2));
   fs.renameSync(t, DB);
 };
+async function uploadImage(dataUri) {
+  if (!useMongo) {
+    const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(
+      dataUri,
+    );
+    const buf = Buffer.from(m[2], "base64");
+    const id = crypto.randomUUID();
+    const name = id + "." + (m[1] === "jpeg" ? "jpg" : m[1]);
+    fs.writeFileSync(path.join(UPLOADS, name), buf);
+    return { id, url: "/uploads/" + name };
+  }
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: "webcraft/projects",
+    resource_type: "image",
+  });
+  return { id: crypto.randomUUID(), url: result.secure_url };
+}
+async function removeImage(url) {
+  if (!url || !useMongo || !url.includes("res.cloudinary.com")) return;
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[^/?]+$/);
+  if (match) await cloudinary.uploader.destroy(match[1], { invalidate: true });
+}
 
 // ---- الجلسات (توكن موقّع، صالح 7 أيام)
 const sign = (s) =>
@@ -147,7 +227,7 @@ function serveFile(res, base, rel) {
 async function api(req, res, url) {
   const p = url.pathname;
   if (req.method === "GET" && p === "/api/projects")
-    return send(res, 200, readDB());
+    return send(res, 200, await readDB());
 
   if (req.method === "POST" && p === "/api/login") {
     const ip = ipOf(req),
@@ -189,30 +269,29 @@ async function api(req, res, url) {
     const buf = Buffer.from(m[2], "base64");
     if (buf.length > 3e6)
       return send(res, 400, { error: "الصورة أكبر من 3MB." });
-    const id = crypto.randomUUID(),
-      name = id + "." + (m[1] === "jpeg" ? "jpg" : m[1]);
-    fs.writeFileSync(path.join(UPLOADS, name), buf);
-    const list = readDB().filter((x) => !x.seed);
+    const uploaded = await uploadImage(b.image);
+    const list = (await readDB()).filter((x) => !x.seed);
     const item = {
-      id,
+      id: uploaded.id,
       title,
       desc,
       url: link,
-      img: "/uploads/" + name,
+      img: uploaded.url,
       createdAt: new Date().toISOString(),
     };
-    writeDB([item, ...list]);
+    await writeDB([item, ...list]);
     return send(res, 201, item);
   }
 
   const del = /^\/api\/projects\/([\w-]+)$/.exec(p);
   if (req.method === "DELETE" && del) {
-    const list = readDB(),
+    const list = await readDB(),
       item = list.find((x) => x.id === del[1]);
     if (!item) return send(res, 404, { error: "المشروع غير موجود." });
     if (item.img.startsWith("/uploads/"))
       fs.rmSync(path.join(UPLOADS, path.basename(item.img)), { force: true });
-    writeDB(list.filter((x) => x.id !== del[1]));
+    else await removeImage(item.img);
+    await writeDB(list.filter((x) => x.id !== del[1]));
     return send(res, 200, { ok: true });
   }
   send(res, 404, { error: "غير موجود" });
