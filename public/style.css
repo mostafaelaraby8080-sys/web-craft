@@ -542,3 +542,151 @@ h2::after {
   font: inherit;
   font-size: 0.85rem;
 }
+
+.quadtree-section {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+.quadtree-section::before,
+.quadtree-section::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: min(42vw, 34rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.22;
+  pointer-events: none;
+}
+.quadtree-section::before {
+  inset: 0 auto auto -12%;
+  background: #2f7bff;
+}
+.quadtree-section::after {
+  inset: auto -10% 0 auto;
+  background: #a044ff;
+}
+.quadtree-heading {
+  max-width: 760px;
+  margin: 0 auto 2rem;
+  text-align: center;
+}
+.quadtree-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  color: var(--brand);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.quadtree-kicker::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22e4f2, #9b68ff);
+  box-shadow: 0 0 16px rgba(87, 133, 255, 0.8);
+}
+.quadtree-heading h2 {
+  margin-bottom: 0.8rem;
+  font-size: clamp(1.65rem, 3.2vw, 2.6rem);
+}
+.quadtree-heading h2::after {
+  margin-inline: auto;
+}
+.quadtree-heading p {
+  max-width: 650px;
+  margin-inline: auto;
+  color: var(--muted);
+}
+.quadtree-stage {
+  position: relative;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 0;
+  background:
+    radial-gradient(ellipse at 18% 18%, rgba(23, 207, 255, 0.12), transparent 42%),
+    radial-gradient(ellipse at 82% 82%, rgba(144, 70, 255, 0.16), transparent 45%),
+    #080d19;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.quadtree-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(22, 219, 255, 0.035), transparent 42%, rgba(169, 74, 255, 0.055));
+}
+.quadtree-stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#quadtreeCanvas2d {
+  opacity: 1;
+}
+#quadtreeCanvas3d {
+  opacity: 0;
+}
+.quadtree-stage-label {
+  position: absolute;
+  z-index: 2;
+  top: clamp(0.7rem, 2vw, 1.25rem);
+  left: clamp(0.7rem, 2vw, 1.25rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(8, 13, 25, 0.72);
+  color: #dce7ff;
+  font: 600 clamp(0.58rem, 1.2vw, 0.78rem)/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+.stage-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: #35e1ef;
+  box-shadow: 0 0 12px #35e1ef;
+}
+.quadtree-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.quadtree-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.quadtree-replay span {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+@media (max-width: 600px) {
+  .quadtree-heading {
+    margin-bottom: 1.4rem;
+  }
+  .quadtree-controls {
+    font-size: 0.78rem;
+  }
+}
