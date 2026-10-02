@@ -21,7 +21,13 @@ const DATA = path.resolve(
 );
 const UPLOADS = path.join(DATA, "uploads");
 const DB = path.join(DATA, "database.json");
+const BACKUPS = path.join(DATA, "backups");
+const LOGS = path.join(DATA, "logs");
+const FAILED_LOGINS_FILE = path.join(DATA, "failed-logins.json");
+
 fs.mkdirSync(UPLOADS, { recursive: true });
+fs.mkdirSync(BACKUPS, { recursive: true });
+fs.mkdirSync(LOGS, { recursive: true });
 
 const hasCloudinary =
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -36,12 +42,16 @@ if (useMongo && hasCloudinary) {
   });
 }
 
-const PASSWORD = process.env.ADMIN_PASSWORD || "webcraft2026";
-if (!process.env.ADMIN_PASSWORD)
-  console.warn("⚠ استخدم متغير ADMIN_PASSWORD لتغيير كلمة المرور الافتراضية.");
+const PASSWORD = process.env.ADMIN_PASSWORD;
+if (!PASSWORD) {
+  console.error(
+    "❌ خطأ حرج: يجب تعيين ADMIN_PASSWORD في متغيرات البيئة.\n" +
+      "   مثال: ADMIN_PASSWORD='كلمة-مرور-قوية-جدًا' node server.js\n" +
+      "   لا تستخدم كلمات مرور ضعيفة أو معروفة.",
+  );
+  process.exit(1);
+}
 
-// On serverless, keep a fallback secret in memory; configure SECRET to keep
-// login tokens valid across separate function instances.
 const keyFile = path.join(DATA, "secret.key");
 let SECRET = process.env.SECRET;
 if (!SECRET) {
@@ -56,6 +66,98 @@ if (!SECRET) {
     }
   }
 }
+
+function logEvent(level, message, details = {}) {
+  const timestamp = new Date().toISOString();
+  const logPath = path.join(
+    LOGS,
+    `${timestamp.slice(0, 10).replace(/-/g, "")}.log`,
+  );
+  const entry = { timestamp, level, message, ...details };
+  fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, { flag: "a" });
+  if (level === "ERROR" || level === "CRITICAL") {
+    console.error(`[${level}] ${message}`, details);
+  }
+}
+
+function readFailedLogins() {
+  try {
+    return JSON.parse(fs.readFileSync(FAILED_LOGINS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeFailedLogins(data) {
+  fs.writeFileSync(FAILED_LOGINS_FILE, JSON.stringify(data, null, 2));
+}
+
+const ipOf = (req) =>
+  (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
+    .split(",")[0]
+    .trim();
+
+function backupDatabase() {
+  if (useMongo) return;
+  try {
+    if (!fs.existsSync(DB)) return;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupFile = path.join(BACKUPS, `database-${timestamp}.json`);
+    fs.copyFileSync(DB, backupFile);
+    const files = fs.readdirSync(BACKUPS).sort().reverse();
+    if (files.length > 10) {
+      for (let i = 10; i < files.length; i++) {
+        fs.rmSync(path.join(BACKUPS, files[i]), { force: true });
+      }
+    }
+    logEvent("INFO", "تم إنشاء نسخة احتياطية من قاعدة البيانات", {
+      backupFile,
+    });
+  } catch (error) {
+    logEvent("ERROR", "فشل إنشاء النسخة الاحتياطية", { error: error.message });
+  }
+}
+if (!isServerless) {
+  setInterval(backupDatabase, 6 * 60 * 60 * 1000);
+  backupDatabase();
+}
+
+const activeSessions = new Map();
+const sign = (s) =>
+  crypto.createHmac("sha256", SECRET).update(s).digest("base64url");
+const makeToken = (ip) => {
+  const exp = String(Date.now() + 7 * 864e5);
+  const token = exp + "." + sign(exp);
+  activeSessions.set(token, {
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
+    ip,
+  });
+  return token;
+};
+function validToken(t) {
+  const [exp, sig] = String(t || "").split(".");
+  if (!exp || !sig || Number(exp) < Date.now()) {
+    activeSessions.delete(t);
+    return false;
+  }
+  const a = Buffer.from(sig),
+    b = Buffer.from(sign(exp));
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return false;
+  }
+  const session = activeSessions.get(t);
+  if (session) session.lastActivity = Date.now();
+  return true;
+}
+function revokeToken(token) {
+  activeSessions.delete(token);
+}
+const isAdmin = (req) => {
+  const token = (req.headers.authorization || "").replace(/^Bearer /, "");
+  return validToken(token) ? token : null;
+};
+const hash = (s) => crypto.createHash("sha256").update(String(s)).digest();
 
 const g = (a, b) => `linear-gradient(135deg,${a},${b})`;
 const SEED = [
@@ -117,11 +219,14 @@ const writeDB = async (list) => {
     const collection = await getMongoCollection();
     await collection.deleteMany({});
     if (list.length) await collection.insertMany(list);
+    logEvent("INFO", "تم حفظ المشاريع في MongoDB", { count: list.length });
     return;
   }
+  backupDatabase();
   const t = DB + ".tmp";
   fs.writeFileSync(t, JSON.stringify(list, null, 2));
   fs.renameSync(t, DB);
+  logEvent("INFO", "تم حفظ المشاريع في الملف", { count: list.length });
 };
 async function uploadImage(dataUri) {
   if (useMongo && !hasCloudinary) {
@@ -131,6 +236,7 @@ async function uploadImage(dataUri) {
     const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(
       dataUri,
     );
+    if (!m) throw new Error("الصورة غير صالحة.");
     const buf = Buffer.from(m[2], "base64");
     const id = crypto.randomUUID();
     const name = id + "." + (m[1] === "jpeg" ? "jpg" : m[1]);
@@ -149,32 +255,6 @@ async function removeImage(url) {
   if (match) await cloudinary.uploader.destroy(match[1], { invalidate: true });
 }
 
-// ---- الجلسات (توكن موقّع، صالح 7 أيام)
-const sign = (s) =>
-  crypto.createHmac("sha256", SECRET).update(s).digest("base64url");
-const makeToken = () => {
-  const exp = String(Date.now() + 7 * 864e5);
-  return exp + "." + sign(exp);
-};
-function validToken(t) {
-  const [exp, sig] = String(t || "").split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const a = Buffer.from(sig),
-    b = Buffer.from(sign(exp));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-const isAdmin = (req) =>
-  validToken((req.headers.authorization || "").replace(/^Bearer /, ""));
-const hash = (s) => crypto.createHash("sha256").update(String(s)).digest();
-
-// ---- تحديد محاولات الدخول الخاطئة: 5 محاولات ثم حظر 10 دقائق
-const fails = new Map();
-const ipOf = (req) =>
-  (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
-    .split(",")[0]
-    .trim();
-
-// ---- أدوات
 const send = (res, code, obj) => {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(obj));
@@ -230,25 +310,48 @@ async function api(req, res, url) {
     return send(res, 200, await readDB());
 
   if (req.method === "POST" && p === "/api/login") {
-    const ip = ipOf(req),
-      f = fails.get(ip) || { n: 0, until: 0 };
-    if (f.until > Date.now())
+    const ip = ipOf(req);
+    const failedLogins = readFailedLogins();
+    const f = failedLogins[ip] || { n: 0, until: 0 };
+
+    if (f.until > Date.now()) {
+      logEvent("WARN", "محاولة دخول من عنوان IP محظور", { ip });
       return send(res, 429, { error: "محاولات كثيرة. حاول بعد قليل." });
-    const { password } = await body(req, 1e4);
-    if (crypto.timingSafeEqual(hash(password), hash(PASSWORD))) {
-      fails.delete(ip);
-      return send(res, 200, { token: makeToken() });
     }
-    f.n++;
+
+    const { password = "" } = await body(req, 1e4);
+    const providedHash = hash(String(password));
+    const passwordHash = hash(PASSWORD);
+    if (crypto.timingSafeEqual(providedHash, passwordHash)) {
+      delete failedLogins[ip];
+      writeFailedLogins(failedLogins);
+      const token = makeToken(ip);
+      logEvent("INFO", "تسجيل دخول ناجح", { ip });
+      return send(res, 200, { token });
+    }
+
+    f.n += 1;
+    logEvent("WARN", "محاولة دخول فاشلة", { ip, attempt: f.n });
+
     if (f.n >= 5) {
       f.until = Date.now() + 10 * 60e3;
       f.n = 0;
+      logEvent("WARN", "تم حظر عنوان IP بسبب محاولات دخول متعددة", { ip });
     }
-    fails.set(ip, f);
+    failedLogins[ip] = f;
+    writeFailedLogins(failedLogins);
     return send(res, 401, { error: "كلمة المرور غير صحيحة." });
   }
 
-  if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
+  if (req.method === "POST" && p === "/api/logout") {
+    const token = (req.headers.authorization || "").replace(/^Bearer /, "");
+    revokeToken(token);
+    logEvent("INFO", "تسجيل خروج", { ip: ipOf(req) });
+    return send(res, 200, { ok: true });
+  }
+
+  const adminToken = isAdmin(req);
+  if (!adminToken) return send(res, 401, { error: "يلزم تسجيل الدخول." });
 
   if (req.method === "POST" && p === "/api/projects") {
     const b = await body(req);
@@ -280,6 +383,11 @@ async function api(req, res, url) {
       createdAt: new Date().toISOString(),
     };
     await writeDB([item, ...list]);
+    logEvent("INFO", "تم إضافة مشروع جديد", {
+      id: item.id,
+      title: item.title,
+      ip: ipOf(req),
+    });
     return send(res, 201, item);
   }
 
@@ -292,6 +400,11 @@ async function api(req, res, url) {
       fs.rmSync(path.join(UPLOADS, path.basename(item.img)), { force: true });
     else await removeImage(item.img);
     await writeDB(list.filter((x) => x.id !== del[1]));
+    logEvent("INFO", "تم حذف مشروع", {
+      id: item.id,
+      title: item.title,
+      ip: ipOf(req),
+    });
     return send(res, 200, { ok: true });
   }
   send(res, 404, { error: "غير موجود" });
@@ -308,8 +421,12 @@ async function requestHandler(req, res) {
       PUB,
       url.pathname === "/" ? "index.html" : url.pathname.slice(1),
     );
-  } catch (e) {
-    send(res, 400, { error: e.message || "خطأ" });
+  } catch (error) {
+    logEvent("ERROR", "خطأ في معالجة الطلب", {
+      error: error.message,
+      url: req.url,
+    });
+    send(res, 400, { error: error.message || "خطأ" });
   }
 }
 
@@ -319,6 +436,11 @@ if (require.main === module) {
   http
     .createServer(requestHandler)
     .listen(PORT, () =>
-      console.log("Web Craft Studio: http://localhost:" + PORT),
+      console.log(
+        "🚀 Web Craft Studio: http://localhost:" +
+          PORT +
+          "\n📁 البيانات: " +
+          DATA,
+      ),
     );
 }
