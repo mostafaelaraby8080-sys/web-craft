@@ -364,6 +364,8 @@ label select {
   color: var(--muted);
 }
 .modal {
+  .modal[hidden]{
+    display: none !important;}
   position: fixed;
   inset: 0;
   background: rgba(5, 9, 20, 0.52);
