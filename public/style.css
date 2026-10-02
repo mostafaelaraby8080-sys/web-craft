@@ -363,9 +363,9 @@ label select {
   padding: 2rem 0;
   color: var(--muted);
 }
+
+/* تنسيق المودال الصحيح والمعدل */
 .modal {
-  .modal[hidden]{
-    display: none !important;}
   position: fixed;
   inset: 0;
   background: rgba(5, 9, 20, 0.52);
@@ -373,6 +373,11 @@ label select {
   place-items: center;
   z-index: 30;
 }
+
+.modal[hidden] {
+  display: none !important;
+}
+
 .box {
   width: min(560px, 92vw);
   background: var(--card);
@@ -470,7 +475,4 @@ textarea {
 .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
-}
-.modal[hidden] {
-  display: none !important;
 }
