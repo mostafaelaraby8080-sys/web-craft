@@ -22,13 +22,40 @@ const DATA = path.resolve(
 const UPLOADS = path.join(DATA, "uploads");
 const DB = path.join(DATA, "database.json");
 const CONTACTS = path.join(DATA, "contacts.json");
-const BACKUPS = path.join(DATA, "backups");
-const LOGS = path.join(DATA, "logs");
-const FAILED_LOGINS_FILE = path.join(DATA, "failed-logins.json");
-
 fs.mkdirSync(UPLOADS, { recursive: true });
-fs.mkdirSync(BACKUPS, { recursive: true });
-fs.mkdirSync(LOGS, { recursive: true });
+
+function readContacts() {
+  try {
+    const contacts = JSON.parse(fs.readFileSync(CONTACTS, "utf8"));
+    if (!Array.isArray(contacts)) {
+      throw new Error("ملف رسائل التواصل لا يحتوي على قائمة صالحة.");
+    }
+    return contacts;
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+function writeContacts(list) {
+  const temporaryFile = CONTACTS + ".tmp";
+  fs.writeFileSync(temporaryFile, JSON.stringify(list, null, 2));
+  fs.renameSync(temporaryFile, CONTACTS);
+}
+
+async function saveContact(contact) {
+  if (useMongo) {
+    await (await getMongoCollection("contacts")).insertOne(contact);
+    return;
+  }
+  if (isServerless) {
+    throw Object.assign(
+      new Error("إعداد قاعدة بيانات دائمة لاستقبال الرسائل غير مكتمل."),
+      { status: 503 },
+    );
+  }
+  writeContacts([contact, ...readContacts()].slice(0, 1000));
+}
 
 const hasCloudinary =
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -43,15 +70,20 @@ if (useMongo && hasCloudinary) {
   });
 }
 
-const PASSWORD = process.env.ADMIN_PASSWORD || "webcraft2026";
-if (!process.env.ADMIN_PASSWORD)
-  console.warn("⚠ استخدم متغير ADMIN_PASSWORD لتغيير كلمة المرور الافتراضية.");
+const PASSWORD = process.env.ADMIN_PASSWORD;
+if (!PASSWORD)
+  console.warn("⚠ دخول المدير معطّل: اضبط ADMIN_PASSWORD في متغيرات البيئة.");
 
+// On serverless, keep a fallback secret in memory; configure SECRET to keep
+// login tokens valid across separate function instances.
 const keyFile = path.join(DATA, "secret.key");
 let SECRET = process.env.SECRET;
 if (!SECRET) {
   if (isServerless) {
     SECRET = crypto.randomBytes(32).toString("hex");
+    console.warn(
+      "⚠ دخول المدير يحتاج SECRET ثابتًا في بيئة serverless حتى تعمل الجلسات بين الطلبات.",
+    );
   } else {
     try {
       SECRET = fs.readFileSync(keyFile, "utf8");
@@ -60,85 +92,6 @@ if (!SECRET) {
       fs.writeFileSync(keyFile, SECRET, { mode: 0o600 });
     }
   }
-}
-
-function logEvent(level, message, details = {}) {
-  const timestamp = new Date().toISOString();
-  const logFile = path.join(LOGS, `${timestamp.slice(0, 10).replace(/-/g, "")}.log`);
-  fs.appendFileSync(logFile, `${JSON.stringify({ timestamp, level, message, ...details })}\n`, {
-    flag: "a",
-  });
-}
-
-function readFailedLogins() {
-  try {
-    return JSON.parse(fs.readFileSync(FAILED_LOGINS_FILE, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeFailedLogins(data) {
-  fs.writeFileSync(FAILED_LOGINS_FILE, JSON.stringify(data, null, 2));
-}
-
-function readContacts() {
-  try {
-    return JSON.parse(fs.readFileSync(CONTACTS, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-function writeContacts(list) {
-  fs.writeFileSync(CONTACTS, JSON.stringify(list, null, 2));
-}
-
-function sanitizeText(value, max = 1000) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
-}
-
-const contactRateLimit = new Map();
-function checkContactRateLimit(ip) {
-  const now = Date.now();
-  const entry = contactRateLimit.get(ip) || { count: 0, until: 0 };
-  if (entry.until && entry.until > now) return false;
-  if (entry.count >= 5 && entry.until && entry.until > now) return false;
-  if (entry.until && entry.until <= now) {
-    entry.count = 0;
-    entry.until = 0;
-  }
-  entry.count += 1;
-  if (entry.count >= 5) {
-    entry.until = now + 10 * 60 * 1000;
-    entry.count = 0;
-  }
-  contactRateLimit.set(ip, entry);
-  return true;
-}
-
-function backupDatabase() {
-  try {
-    if (!fs.existsSync(DB)) return;
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupFile = path.join(BACKUPS, `database-${ts}.json`);
-    fs.copyFileSync(DB, backupFile);
-    const files = fs.readdirSync(BACKUPS).sort().reverse();
-    if (files.length > 10) {
-      for (let i = 10; i < files.length; i++) {
-        fs.rmSync(path.join(BACKUPS, files[i]), { force: true });
-      }
-    }
-  } catch (error) {
-    logEvent("ERROR", "فشل في النسخ الاحتياطي", { error: error.message });
-  }
-}
-if (!isServerless) {
-  setInterval(backupDatabase, 6 * 60 * 60 * 1000);
 }
 
 const g = (a, b) => `linear-gradient(135deg,${a},${b})`;
@@ -165,23 +118,34 @@ const SEED = [
     seed: true,
   },
 ];
-let mongoClient;
-let projectsCollection;
-async function getMongoCollection() {
+let mongoDatabasePromise;
+async function getMongoDatabase() {
   if (!useMongo) return null;
-  if (!projectsCollection) {
-    mongoClient = new MongoClient(process.env.MONGODB_URI);
-    await mongoClient.connect();
-    projectsCollection = mongoClient
-      .db(process.env.MONGODB_DB || "webcraft")
-      .collection("projects");
-    await projectsCollection.createIndex({ id: 1 }, { unique: true });
+  if (!mongoDatabasePromise) {
+    mongoDatabasePromise = (async () => {
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      return client.db(process.env.MONGODB_DB || "webcraft");
+    })().catch((error) => {
+      mongoDatabasePromise = null;
+      throw error;
+    });
   }
-  return projectsCollection;
+  return mongoDatabasePromise;
 }
-const readDB = () => {
+const indexedCollections = new Set();
+async function getMongoCollection(name = "projects") {
+  const collection = (await getMongoDatabase()).collection(name);
+  if (!indexedCollections.has(name)) {
+    await collection.createIndex({ id: 1 }, { unique: true });
+    indexedCollections.add(name);
+  }
+  return collection;
+}
+const readDB = async () => {
   if (useMongo)
-    return getMongoCollection().then(async (collection) => {
+    return (async () => {
+      const collection = await getMongoCollection();
       const projects = await collection
         .find({}, { projection: { _id: 0 } })
         .sort({ createdAt: -1 })
@@ -189,11 +153,16 @@ const readDB = () => {
       if (projects.length) return projects;
       await collection.insertMany(SEED);
       return SEED.slice();
-    });
+    })();
   try {
-    return JSON.parse(fs.readFileSync(DB, "utf8"));
-  } catch {
-    return SEED.slice();
+    const projects = JSON.parse(fs.readFileSync(DB, "utf8"));
+    if (!Array.isArray(projects)) {
+      throw new Error("ملف المشاريع لا يحتوي على قائمة صالحة.");
+    }
+    return projects;
+  } catch (error) {
+    if (error.code === "ENOENT") return SEED.slice();
+    throw error;
   }
 };
 const writeDB = async (list) => {
@@ -233,6 +202,7 @@ async function removeImage(url) {
   if (match) await cloudinary.uploader.destroy(match[1], { invalidate: true });
 }
 
+// ---- الجلسات (توكن موقّع، صالح 7 أيام)
 const sign = (s) =>
   crypto.createHmac("sha256", SECRET).update(s).digest("base64url");
 const makeToken = () => {
@@ -249,12 +219,41 @@ function validToken(t) {
 const isAdmin = (req) =>
   validToken((req.headers.authorization || "").replace(/^Bearer /, ""));
 const hash = (s) => crypto.createHash("sha256").update(String(s)).digest();
+
+// ---- تحديد محاولات الدخول الخاطئة: 5 محاولات ثم حظر 10 دقائق
 const fails = new Map();
 const ipOf = (req) =>
   (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
     .split(",")[0]
     .trim();
 
+function sanitizeText(value, max = 1000) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+const contactRateLimit = new Map();
+function checkContactRateLimit(ip) {
+  const now = Date.now();
+  const entry = contactRateLimit.get(ip) || { count: 0, until: 0 };
+  if (entry.until && entry.until > now) return false;
+  if (entry.until && entry.until <= now) {
+    entry.count = 0;
+    entry.until = 0;
+  }
+  entry.count += 1;
+  if (entry.count >= 5) {
+    entry.until = now + 10 * 60 * 1000;
+    entry.count = 0;
+  }
+  contactRateLimit.set(ip, entry);
+  return true;
+}
+
+// ---- أدوات
 const send = (res, code, obj) => {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(obj));
@@ -263,20 +262,23 @@ function body(req, limit = 6e6) {
   return new Promise((ok, no) => {
     let n = 0;
     const chunks = [];
+    let tooLarge = false;
     req.on("data", (c) => {
       n += c.length;
       if (n > limit) {
-        no(new Error("الطلب كبير جدًا"));
-        req.destroy();
-      } else chunks.push(c);
+        tooLarge = true;
+        chunks.length = 0;
+      } else if (!tooLarge) chunks.push(c);
     });
     req.on("end", () => {
+      if (tooLarge) return no(Object.assign(new Error("الطلب كبير جدًا"), { status: 413 }));
       try {
         ok(JSON.parse(Buffer.concat(chunks).toString() || "{}"));
       } catch {
-        no(new Error("بيانات غير صالحة"));
+        no(Object.assign(new Error("بيانات غير صالحة"), { status: 400 }));
       }
     });
+    req.on("error", no);
   });
 }
 const MIME = {
@@ -309,8 +311,64 @@ async function api(req, res, url) {
   if (req.method === "GET" && p === "/api/projects")
     return send(res, 200, await readDB());
 
+  if (req.method === "GET" && p === "/api/contact") {
+    if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
+    if (useMongo) {
+      const contacts = await getMongoCollection("contacts")
+        .find({}, { projection: { _id: 0 } })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .toArray();
+      return send(res, 200, contacts);
+    }
+    if (isServerless) {
+      return send(res, 503, {
+        error: "قراءة رسائل التواصل تحتاج إلى قاعدة بيانات دائمة.",
+      });
+    }
+    return send(res, 200, readContacts().slice(0, 100));
+  }
+
+  if (req.method === "POST" && p === "/api/contact") {
+    const b = await body(req, 32e3);
+    const name = sanitizeText(b.name, 60);
+    const email = String(b.email || "").trim().slice(0, 120);
+    const phone = sanitizeText(b.phone, 30);
+    const service = sanitizeText(b.service, 60);
+    const message = sanitizeText(b.message, 1000);
+
+    if (!name || !isValidEmail(email) || !message) {
+      return send(res, 400, {
+        error: "أدخل الاسم والبريد الإلكتروني ورسالة صحيحة.",
+      });
+    }
+    if (!checkContactRateLimit(ipOf(req))) {
+      return send(res, 429, {
+        error: "تم استلام رسائل كثيرة. حاول مرة أخرى بعد قليل.",
+      });
+    }
+
+    await saveContact({
+      id: crypto.randomUUID(),
+      name,
+      email,
+      phone,
+      service,
+      message,
+      createdAt: new Date().toISOString(),
+    });
+    return send(res, 201, { ok: true });
+  }
+
   if (req.method === "POST" && p === "/api/login") {
-    const ip = ipOf(req), f = fails.get(ip) || { n: 0, until: 0 };
+    if (!PASSWORD || (isServerless && !process.env.SECRET)) {
+      req.resume();
+      return send(res, 503, {
+        error: "دخول المدير غير مُعدّ. راجع إعدادات ADMIN_PASSWORD و SECRET.",
+      });
+    }
+    const ip = ipOf(req),
+      f = fails.get(ip) || { n: 0, until: 0 };
     if (f.until > Date.now())
       return send(res, 429, { error: "محاولات كثيرة. حاول بعد قليل." });
     const { password } = await body(req, 1e4);
@@ -325,77 +383,6 @@ async function api(req, res, url) {
     }
     fails.set(ip, f);
     return send(res, 401, { error: "كلمة المرور غير صحيحة." });
-  }
-
-  if (req.method === "POST" && p === "/api/contact") {
-    const ip = ipOf(req);
-    if (!checkContactRateLimit(ip)) {
-      return send(res, 429, { error: "تم إرسال عدد كبير من الرسائل. حاول بعد قليل." });
-    }
-    const b = await body(req, 1e5);
-    const name = sanitizeText(b.name, 60);
-    const email = sanitizeText(b.email, 120);
-    const phone = sanitizeText(b.phone, 30);
-    const service = sanitizeText(b.service, 60);
-    const message = sanitizeText(b.message, 1000);
-
-    if (!name || name.length < 2)
-      return send(res, 400, { error: "الاسم مطلوب على الأقل حرفين." });
-    if (!isValidEmail(email))
-      return send(res, 400, { error: "البريد الإلكتروني غير صالح." });
-    if (!message || message.length < 10)
-      return send(res, 400, { error: "الرسالة مطلوبة وتجب أن تكون 10 أحرف على الأقل." });
-
-    const list = readContacts();
-    const item = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      phone,
-      service,
-      message,
-      ip,
-      status: "new",
-      createdAt: new Date().toISOString(),
-    };
-    list.unshift(item);
-    writeContacts(list);
-    logEvent("INFO", "تم استقبال رسالة عميل جديدة", {
-      id: item.id,
-      email: item.email,
-      ip,
-    });
-    return send(res, 201, { ok: true, message: "تم إرسال رسالتك بنجاح." });
-  }
-
-  if (req.method === "GET" && p === "/api/contacts") {
-    if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
-    return send(res, 200, readContacts().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-  }
-
-  if (req.method === "PATCH" && /^\/api\/contacts\/([A-Za-z0-9-]+)$/.test(p)) {
-    if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
-    const match = /^\/api\/contacts\/([A-Za-z0-9-]+)$/.exec(p);
-    const id = match[1];
-    const bodyData = await body(req, 1e4);
-    const list = readContacts();
-    const item = list.find((x) => x.id === id);
-    if (!item) return send(res, 404, { error: "الرسالة غير موجودة." });
-    item.status = ["new", "read", "closed"].includes(bodyData.status)
-      ? bodyData.status
-      : item.status;
-    writeContacts(list);
-    return send(res, 200, item);
-  }
-
-  if (req.method === "DELETE" && /^\/api\/contacts\/([A-Za-z0-9-]+)$/.test(p)) {
-    if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
-    const match = /^\/api\/contacts\/([A-Za-z0-9-]+)$/.exec(p);
-    const id = match[1];
-    const list = readContacts();
-    const filtered = list.filter((x) => x.id !== id);
-    writeContacts(filtered);
-    return send(res, 200, { ok: true });
   }
 
   if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
@@ -459,7 +446,11 @@ async function requestHandler(req, res) {
       url.pathname === "/" ? "index.html" : url.pathname.slice(1),
     );
   } catch (e) {
-    send(res, 400, { error: e.message || "خطأ" });
+    const status = Number.isInteger(e.status) ? e.status : 500;
+    if (status >= 500) console.error("Web Craft Studio request failed:", e);
+    send(res, status, {
+      error: status >= 500 ? "تعذّر إكمال الطلب. حاول مرة أخرى لاحقًا." : e.message,
+    });
   }
 }
 
