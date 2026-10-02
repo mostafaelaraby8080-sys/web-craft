@@ -1,5 +1,4 @@
 "use strict";
-// النسخة المرتبطة بالـ Backend: المشاريع وتسجيل الدخول عبر /api
 const TOKEN_KEY = "wcs_token";
 const THEME_KEY = "wcs_theme";
 const $ = (s) => document.querySelector(s);
@@ -8,7 +7,11 @@ const grid = $("#projectGrid"),
   form = $("#form");
 const login = $("#login"),
   pw = $("#pw"),
-  pwErr = $("#pwErr");
+  pwErr = $("#pwErr"),
+  projectSearch = $("#projectSearch"),
+  projectStatusFilter = $("#projectStatusFilter"),
+  projectCategoryFilter = $("#projectCategoryFilter"),
+  clearFiltersBtn = $("#clearFilters");
 let token = null,
   projects = [],
   toastT;
@@ -46,6 +49,7 @@ function toast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(() => (t.hidden = true), 3500);
 }
+
 function esc(t) {
   const d = document.createElement("div");
   d.textContent = t;
@@ -71,6 +75,13 @@ async function api(path, opts = {}) {
   return data;
 }
 
+function projectMeta(project) {
+  const statusLabel = project.status === "draft" ? "مسودة" : "منشور";
+  return `
+    ${admin ? `<div class="meta-row"><span class="status-badge ${project.status}">${statusLabel}</span><span class="category-badge">${esc(project.category || "عام")}</span></div>` : ""}
+  `;
+}
+
 function render() {
   if (!projects.length) {
     grid.innerHTML = '<p class="empty">لا توجد مشاريع بعد.</p>';
@@ -82,7 +93,8 @@ function render() {
     <article class="card proj">
       <div class="wrap"><div class="thumb" style="background-image:${p.img.startsWith("linear") ? p.img : `url(${encodeURI(p.img)})`}"></div></div>
       <div class="body">
-        ${admin && !p.seed ? `<button class="del" data-id="${esc(p.id)}" title="حذف" aria-label="حذف المشروع">🗑</button>` : ""}
+        ${admin && !p.seed ? `<div class="admin-actions"><button class="edit" data-id="${esc(p.id)}" title="تعديل" aria-label="تعديل المشروع">✎</button><button class="del" data-id="${esc(p.id)}" title="حذف" aria-label="حذف المشروع">🗑</button></div>` : ""}
+        ${projectMeta(p)}
         <h3>${esc(p.title)}</h3><p>${esc(p.desc)}</p>
         ${p.url ? `<a class="visit" href="${esc(p.url)}" target="_blank" rel="noopener">زيارة المشروع</a>` : ""}
       </div>
@@ -120,9 +132,33 @@ function observeReveals(elements) {
   elements.forEach((element) => revealObserver.observe(element));
 }
 
+function buildProjectQuery() {
+  const params = new URLSearchParams();
+  const search = projectSearch ? projectSearch.value.trim() : "";
+  const status = projectStatusFilter ? projectStatusFilter.value : "all";
+  const category = projectCategoryFilter ? projectCategoryFilter.value : "all";
+  if (search) params.set("search", search);
+  if (status && status !== "all") params.set("status", status);
+  if (category && category !== "all") params.set("category", category);
+  params.set("page", "1");
+  params.set("limit", "12");
+  return params;
+}
+
 async function loadProjects() {
   try {
-    projects = await api("/projects");
+    const params = buildProjectQuery();
+    const data = await api(`/projects?${params.toString()}`);
+    const payload = Array.isArray(data) ? { projects: data } : data;
+    projects = payload.projects || [];
+    const categories = [...new Set(projects.map((p) => p.category).filter(Boolean))];
+    if (projectCategoryFilter) {
+      const current = projectCategoryFilter.value;
+      projectCategoryFilter.innerHTML = `<option value="all">كل التصنيفات</option>${categories
+        .map((c) => `<option value="${esc(c)}">${esc(c)}</option>`)
+        .join("")}`;
+      projectCategoryFilter.value = categories.includes(current) ? current : "all";
+    }
     render();
   } catch (e) {
     grid.innerHTML =
@@ -142,11 +178,16 @@ function setAdmin(on, t) {
   $("#adminBtn").classList.toggle("on", on);
   $("#adminBtn").textContent = on ? "🔓" : "🔒";
   $("#adminBtn").title = on ? "خروج المدير" : "دخول المدير";
-  render();
+  loadProjects();
 }
 
-$("#adminBtn").onclick = () => {
+$("#adminBtn").onclick = async () => {
   if (admin) {
+    try {
+      await api("/logout", { method: "POST" });
+    } catch (err) {
+      // تجاهل، لأنه قد يكون قد انتهت الجلسة بالفعل
+    }
     setAdmin(false);
     return toast("تم تسجيل الخروج");
   }
@@ -178,31 +219,72 @@ $("#loginForm").onsubmit = async (e) => {
   }
 };
 
-$("#addBtn").onclick = () => {
+function resetProjectForm() {
+  form.reset();
+  form.querySelector('[name="id"]').value = "";
+  form.querySelector('[name="status"]').value = "published";
+  form.querySelector('[name="order"]').value = "0";
+}
+
+function openProjectModal(project) {
   modal.hidden = false;
+  form.querySelector('[name="id"]').value = project ? project.id : "";
+  form.querySelector('[name="title"]').value = project ? project.title : "";
+  form.querySelector('[name="desc"]').value = project ? project.desc : "";
+  form.querySelector('[name="url"]').value = project ? project.url || "" : "";
+  form.querySelector('[name="category"]').value = project ? project.category || "عام" : "عام";
+  form.querySelector('[name="status"]').value = project ? project.status : "published";
+  form.querySelector('[name="order"]').value = project ? project.order || 0 : 0;
+  const fileField = form.querySelector('[name="img"]');
+  fileField.required = !project;
+}
+
+$("#addBtn").onclick = () => {
+  openProjectModal(null);
 };
 $("#cancel").onclick = () => {
   modal.hidden = true;
-  form.reset();
+  resetProjectForm();
 };
 modal.onclick = (e) => {
   if (e.target === modal) $("#cancel").click();
 };
 
+function getProjectFormValues() {
+  const formData = new FormData(form);
+  return {
+    id: formData.get("id") || "",
+    title: String(formData.get("title") || "").trim(),
+    desc: String(formData.get("desc") || "").trim(),
+    url: String(formData.get("url") || "").trim(),
+    status: String(formData.get("status") || "published"),
+    category: String(formData.get("category") || "عام").trim() || "عام",
+    order: Number(formData.get("order") || 0),
+    image: formData.get("img") || null,
+  };
+}
+
 grid.onclick = async (e) => {
-  const b = e.target.closest(".del");
-  if (!b) return;
-  if (!b.classList.contains("sure")) {
-    b.classList.add("sure");
-    b.textContent = "تأكيد الحذف";
+  const editBtn = e.target.closest(".edit");
+  if (editBtn) {
+    const project = projects.find((item) => item.id === editBtn.dataset.id);
+    if (project) openProjectModal(project);
+    return;
+  }
+
+  const delBtn = e.target.closest(".del");
+  if (!delBtn) return;
+  if (!delBtn.classList.contains("sure")) {
+    delBtn.classList.add("sure");
+    delBtn.textContent = "تأكيد الحذف";
     setTimeout(() => {
-      b.classList.remove("sure");
-      b.textContent = "🗑";
+      delBtn.classList.remove("sure");
+      delBtn.textContent = "🗑";
     }, 3000);
     return;
   }
   try {
-    await api("/projects/" + b.dataset.id, { method: "DELETE" });
+    await api("/projects/" + delBtn.dataset.id, { method: "DELETE" });
     toast("تم حذف المشروع");
     await loadProjects();
   } catch (err) {
@@ -210,7 +292,6 @@ grid.onclick = async (e) => {
   }
 };
 
-// تصغير الصورة قبل الرفع
 function shrink(file) {
   return new Promise((res, rej) => {
     const img = new Image(),
@@ -231,25 +312,37 @@ function shrink(file) {
 
 form.onsubmit = async (e) => {
   e.preventDefault();
-  const f = new FormData(form),
-    btn = form.querySelector("[type=submit]");
+  const values = getProjectFormValues();
+  const btn = form.querySelector("[type=submit]");
   btn.disabled = true;
   try {
-    const image = await shrink(f.get("img"));
-    await api("/projects", {
-      method: "POST",
-      body: JSON.stringify({
-        title: f.get("title"),
-        desc: f.get("desc"),
-        url: f.get("url"),
-        image,
-      }),
+    const payload = {
+      title: values.title,
+      desc: values.desc,
+      url: values.url,
+      status: values.status,
+      category: values.category,
+      order: values.order,
+    };
+
+    if (values.image && values.image.size > 0) {
+      payload.image = await shrink(values.image);
+    }
+
+    const isEdit = Boolean(values.id);
+    const endpoint = isEdit ? `/projects/${values.id}` : "/projects";
+    const method = isEdit ? "PUT" : "POST";
+
+    await api(endpoint, {
+      method,
+      body: JSON.stringify(payload),
     });
+
     $("#cancel").click();
-    toast("تمت إضافة المشروع");
+    toast(isEdit ? "تم تحديث المشروع" : "تمت إضافة المشروع");
     await loadProjects();
   } catch (err) {
-    toast(err.message || "تعذّر رفع المشروع");
+    toast(err.message || "تعذّر حفظ المشروع");
   }
   btn.disabled = false;
 };
@@ -271,6 +364,30 @@ $(".phone").onclick = (e) => {
     () => toast("رقم الهاتف: " + n),
   );
 };
+
+if (projectSearch) {
+  projectSearch.addEventListener("input", () => {
+    loadProjects();
+  });
+}
+if (projectStatusFilter) {
+  projectStatusFilter.addEventListener("change", () => {
+    loadProjects();
+  });
+}
+if (projectCategoryFilter) {
+  projectCategoryFilter.addEventListener("change", () => {
+    loadProjects();
+  });
+}
+if (clearFiltersBtn) {
+  clearFiltersBtn.addEventListener("click", () => {
+    if (projectSearch) projectSearch.value = "";
+    if (projectStatusFilter) projectStatusFilter.value = "all";
+    if (projectCategoryFilter) projectCategoryFilter.value = "all";
+    loadProjects();
+  });
+}
 
 setAdmin(admin, token);
 observeReveals();
