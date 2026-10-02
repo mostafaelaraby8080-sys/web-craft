@@ -185,9 +185,7 @@ $("#adminBtn").onclick = async () => {
   if (admin) {
     try {
       await api("/logout", { method: "POST" });
-    } catch (err) {
-      // تجاهل، لأنه قد يكون قد انتهت الجلسة بالفعل
-    }
+    } catch (err) {}
     setAdmin(false);
     return toast("تم تسجيل الخروج");
   }
@@ -202,20 +200,27 @@ $("#loginCancel").onclick = () => {
 login.onclick = (e) => {
   if (e.target === login) login.hidden = true;
 };
+
+// [التعديل هنا] تحديث دالة تسجيل الدخول لإخفاء النافذة فوراً وتطبيق صلاحيات المدير
 $("#loginForm").onsubmit = async (e) => {
   e.preventDefault();
+  const submitBtn = e.target.querySelector("[type=submit]");
+  submitBtn.disabled = true;
   try {
     const { token: t } = await api("/login", {
       method: "POST",
       body: JSON.stringify({ password: pw.value }),
     });
     login.hidden = true;
+    pw.value = "";
     setAdmin(true, t);
-    toast("تم تسجيل الدخول");
+    toast("تم تسجيل الدخول بنجاح");
   } catch (err) {
-    pwErr.textContent = err.message;
+    pwErr.textContent = err.message || "كلمة المرور غير صحيحة";
     pwErr.hidden = false;
     pw.select();
+  } finally {
+    submitBtn.disabled = false;
   }
 };
 
