@@ -1,5 +1,5 @@
 "use strict";
-// Backend بدون أي مكتبات: Node.js فقط.
+// Backend: Node.js + (اختياري) MongoDB و Cloudinary عند وجود المتغيرات.
 const http = require("http"),
   fs = require("fs"),
   path = require("path"),
@@ -36,14 +36,12 @@ const DB = path.join(DATA, "database.json");
 const CONTACTS = path.join(DATA, "contacts.json");
 fs.mkdirSync(UPLOADS, { recursive: true });
 
+// ---- رسائل التواصل (ملف محلي)
 function readContacts() {
   try {
     const contacts = JSON.parse(fs.readFileSync(CONTACTS, "utf8"));
     if (!Array.isArray(contacts))
       throw new Error("ملف رسائل التواصل لا يحتوي على قائمة صالحة.");
-    if (!Array.isArray(contacts)) {
-      throw new Error("ملف رسائل التواصل لا يحتوي على قائمة صالحة.");
-    }
     return contacts;
   } catch (error) {
     if (error.code === "ENOENT") return [];
@@ -71,10 +69,12 @@ async function saveContact(contact) {
   writeContacts([contact, ...readContacts()].slice(0, 1000));
 }
 
-const hasCloudinary =
+// ---- Cloudinary
+const hasCloudinary = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
   process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET;
+  process.env.CLOUDINARY_API_SECRET,
+);
 
 if (useMongo && hasCloudinary) {
   cloudinary.config({
@@ -88,9 +88,6 @@ if (useMongo && hasCloudinary) {
 const PASSWORD = process.env.ADMIN_PASSWORD;
 if (!PASSWORD)
   console.warn("⚠ دخول المدير معطّل: اضبط ADMIN_PASSWORD في متغيرات البيئة.");
-  console.log("ADMIN_PASSWORD set?" !!process.env.ADMIN_PASSWORD);
-  
-
 
 // On serverless, keep a fallback secret in memory; configure SECRET to keep
 // login tokens valid across separate function instances.
@@ -112,6 +109,7 @@ if (!SECRET) {
   }
 }
 
+// ---- أمثلة افتراضية
 const g = (a, b) => `linear-gradient(135deg,${a},${b})`;
 const SEED = [
   {
@@ -137,6 +135,7 @@ const SEED = [
   },
 ];
 
+// ---- MongoDB
 let mongoDatabasePromise;
 async function getMongoDatabase() {
   if (!useMongo) return null;
@@ -158,9 +157,6 @@ async function getMongoCollection(name = "projects") {
   const db = await getMongoDatabase();
   if (!db) return null;
   const collection = db.collection(name);
-const indexedCollections = new Set();
-async function getMongoCollection(name = "projects") {
-  const collection = (await getMongoDatabase()).collection(name);
   if (!indexedCollections.has(name)) {
     await collection.createIndex({ id: 1 }, { unique: true });
     indexedCollections.add(name);
@@ -168,6 +164,7 @@ async function getMongoCollection(name = "projects") {
   return collection;
 }
 
+// ---- المشاريع (ملف محلي)
 const readFileProjects = () => {
   try {
     const projects = JSON.parse(fs.readFileSync(DB, "utf8"));
@@ -176,26 +173,6 @@ const readFileProjects = () => {
     return projects;
   } catch (error) {
     if (error.code === "ENOENT") return null; // لم يُنشأ الملف بعد
-const readDB = async () => {
-  if (useMongo)
-    return (async () => {
-      const collection = await getMongoCollection();
-      const projects = await collection
-        .find({}, { projection: { _id: 0 } })
-        .sort({ createdAt: -1 })
-        .toArray();
-      if (projects.length) return projects;
-      await collection.insertMany(SEED);
-      return SEED.slice();
-    })();
-  try {
-    const projects = JSON.parse(fs.readFileSync(DB, "utf8"));
-    if (!Array.isArray(projects)) {
-      throw new Error("ملف المشاريع لا يحتوي على قائمة صالحة.");
-    }
-    return projects;
-  } catch (error) {
-    if (error.code === "ENOENT") return SEED.slice();
     throw error;
   }
 };
@@ -219,12 +196,16 @@ const hideSeeds = async () => {
 
 const readDB = async () => {
   if (useMongo) {
-    const projects = await (await getMongoCollection())
+    const projects = await (
+      await getMongoCollection()
+    )
       .find({}, { projection: { _id: 0 } })
       .sort({ createdAt: -1 })
       .toArray();
     if (projects.length) return projects;
-    const hidden = await (await getMongoCollection("meta")).findOne({
+    const hidden = await (
+      await getMongoCollection("meta")
+    ).findOne({
       id: "seedsHidden",
     });
     return hidden ? [] : SEED.map((x) => ({ ...x }));
@@ -252,6 +233,7 @@ async function removeProject(id, wasSeed) {
   writeFileProjects(list);
 }
 
+// ---- الصور
 async function uploadImage(dataUri) {
   if (useMongo && !hasCloudinary) {
     throw Object.assign(
@@ -318,7 +300,6 @@ function sanitizeText(value, max = 1000) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 function isValidEmail(value) {
@@ -368,10 +349,13 @@ function body(req, limit = 6e6) {
     req.on("end", () => {
       if (tooLarge)
         return no(Object.assign(new Error("الطلب كبير جدًا"), { status: 413 }));
-      if (tooLarge) return no(Object.assign(new Error("الطلب كبير جدًا"), { status: 413 }));
       try {
         const parsed = JSON.parse(Buffer.concat(chunks).toString() || "{}");
-        ok(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {});
+        ok(
+          parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? parsed
+            : {},
+        );
       } catch {
         no(Object.assign(new Error("بيانات غير صالحة"), { status: 400 }));
       }
@@ -421,6 +405,7 @@ function serveFile(res, base, rel, immutable = false) {
   });
 }
 
+// ---- الـ API
 async function api(req, res, url) {
   const p = url.pathname;
 
@@ -430,12 +415,8 @@ async function api(req, res, url) {
   if (req.method === "GET" && p === "/api/contact") {
     if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
     if (useMongo) {
-
       const contactsCollection = await getMongoCollection("contacts");
       const contacts = await contactsCollection
-
-      const contacts = await getMongoCollection("contacts")
-
         .find({}, { projection: { _id: 0 } })
         .sort({ createdAt: -1 })
         .limit(100)
@@ -456,7 +437,6 @@ async function api(req, res, url) {
     const email = String(b.email || "")
       .trim()
       .slice(0, 120);
-    const email = String(b.email || "").trim().slice(0, 120);
     const phone = sanitizeText(b.phone, 30);
     const service = sanitizeText(b.service, 60);
     const message = sanitizeText(b.message, 1000);
@@ -482,8 +462,6 @@ async function api(req, res, url) {
       message,
       createdAt: new Date().toISOString(),
     });
-
-
 
     return send(res, 201, { ok: true });
   }
@@ -591,14 +569,10 @@ async function requestHandler(req, res) {
     );
   } catch (e) {
     const status = Number.isInteger(e.status) ? e.status : 500;
- (status >= 500) console.error("Web Craft Studio request failed:", e);
+    if (status >= 500) console.error("Web Craft Studio request failed:", e);
     send(res, status, {
-
       error:
         status >= 500 ? "تعذّر إكمال الطلب. حاول مرة أخرى لاحقًا." : e.message,
-
-      error: status >= 500 ? "تعذّر إكمال الطلب. حاول مرة أخرى لاحقًا." : e.message,
-
     });
   }
 }
