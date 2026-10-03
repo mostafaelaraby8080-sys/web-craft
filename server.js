@@ -39,14 +39,11 @@ fs.mkdirSync(UPLOADS, { recursive: true });
 function readContacts() {
   try {
     const contacts = JSON.parse(fs.readFileSync(CONTACTS, "utf8"));
-<<<<<<< HEAD
     if (!Array.isArray(contacts))
       throw new Error("ملف رسائل التواصل لا يحتوي على قائمة صالحة.");
-=======
     if (!Array.isArray(contacts)) {
       throw new Error("ملف رسائل التواصل لا يحتوي على قائمة صالحة.");
     }
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     return contacts;
   } catch (error) {
     if (error.code === "ENOENT") return [];
@@ -136,10 +133,7 @@ const SEED = [
     seed: true,
   },
 ];
-<<<<<<< HEAD
 
-=======
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
 let mongoDatabasePromise;
 async function getMongoDatabase() {
   if (!useMongo) return null;
@@ -155,25 +149,21 @@ async function getMongoDatabase() {
   }
   return mongoDatabasePromise;
 }
-<<<<<<< HEAD
 
 const indexedCollections = new Set();
 async function getMongoCollection(name = "projects") {
   const db = await getMongoDatabase();
   if (!db) return null;
   const collection = db.collection(name);
-=======
 const indexedCollections = new Set();
 async function getMongoCollection(name = "projects") {
   const collection = (await getMongoDatabase()).collection(name);
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
   if (!indexedCollections.has(name)) {
     await collection.createIndex({ id: 1 }, { unique: true });
     indexedCollections.add(name);
   }
   return collection;
 }
-<<<<<<< HEAD
 
 const readFileProjects = () => {
   try {
@@ -183,7 +173,6 @@ const readFileProjects = () => {
     return projects;
   } catch (error) {
     if (error.code === "ENOENT") return null; // لم يُنشأ الملف بعد
-=======
 const readDB = async () => {
   if (useMongo)
     return (async () => {
@@ -204,7 +193,6 @@ const readDB = async () => {
     return projects;
   } catch (error) {
     if (error.code === "ENOENT") return SEED.slice();
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     throw error;
   }
 };
@@ -323,14 +311,11 @@ const ipOf = (req) =>
     .trim();
 
 function sanitizeText(value, max = 1000) {
-<<<<<<< HEAD
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);
-=======
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
 }
 
 function isValidEmail(value) {
@@ -378,12 +363,9 @@ function body(req, limit = 6e6) {
       } else if (!tooLarge) chunks.push(c);
     });
     req.on("end", () => {
-<<<<<<< HEAD
       if (tooLarge)
         return no(Object.assign(new Error("الطلب كبير جدًا"), { status: 413 }));
-=======
       if (tooLarge) return no(Object.assign(new Error("الطلب كبير جدًا"), { status: 413 }));
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
       try {
         const parsed = JSON.parse(Buffer.concat(chunks).toString() || "{}");
         ok(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {});
@@ -445,12 +427,12 @@ async function api(req, res, url) {
   if (req.method === "GET" && p === "/api/contact") {
     if (!isAdmin(req)) return send(res, 401, { error: "يلزم تسجيل الدخول." });
     if (useMongo) {
-<<<<<<< HEAD
+
       const contactsCollection = await getMongoCollection("contacts");
       const contacts = await contactsCollection
-=======
+
       const contacts = await getMongoCollection("contacts")
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
+
         .find({}, { projection: { _id: 0 } })
         .sort({ createdAt: -1 })
         .limit(100)
@@ -468,13 +450,10 @@ async function api(req, res, url) {
   if (req.method === "POST" && p === "/api/contact") {
     const b = await body(req, 32e3);
     const name = sanitizeText(b.name, 60);
-<<<<<<< HEAD
     const email = String(b.email || "")
       .trim()
       .slice(0, 120);
-=======
     const email = String(b.email || "").trim().slice(0, 120);
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     const phone = sanitizeText(b.phone, 30);
     const service = sanitizeText(b.service, 60);
     const message = sanitizeText(b.message, 1000);
@@ -484,10 +463,7 @@ async function api(req, res, url) {
         error: "أدخل الاسم والبريد الإلكتروني ورسالة صحيحة.",
       });
     }
-<<<<<<< HEAD
 
-=======
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     if (!checkContactRateLimit(ipOf(req))) {
       return send(res, 429, {
         error: "تم استلام رسائل كثيرة. حاول مرة أخرى بعد قليل.",
@@ -503,10 +479,9 @@ async function api(req, res, url) {
       message,
       createdAt: new Date().toISOString(),
     });
-<<<<<<< HEAD
 
-=======
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
+
+
     return send(res, 201, { ok: true });
   }
 
@@ -517,10 +492,6 @@ async function api(req, res, url) {
         error: "دخول المدير غير مُعدّ. راجع إعدادات ADMIN_PASSWORD و SECRET.",
       });
     }
-<<<<<<< HEAD
-
-=======
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     const ip = ipOf(req),
       f = fails.get(ip) || { n: 0, until: 0 };
 
@@ -617,14 +588,14 @@ async function requestHandler(req, res) {
     );
   } catch (e) {
     const status = Number.isInteger(e.status) ? e.status : 500;
-    if (status >= 500) console.error("Web Craft Studio request failed:", e);
+ (status >= 500) console.error("Web Craft Studio request failed:", e);
     send(res, status, {
-<<<<<<< HEAD
+
       error:
         status >= 500 ? "تعذّر إكمال الطلب. حاول مرة أخرى لاحقًا." : e.message,
-=======
+
       error: status >= 500 ? "تعذّر إكمال الطلب. حاول مرة أخرى لاحقًا." : e.message,
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
+
     });
   }
 }
