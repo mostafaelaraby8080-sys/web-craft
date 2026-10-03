@@ -11,6 +11,8 @@ const login = $("#login"),
   pwErr = $("#pwErr");
 let token = null,
   projects = [],
+  activeModal = null,
+  modalTrigger = null,
   toastT;
 try {
   token = sessionStorage.getItem(TOKEN_KEY);
@@ -37,7 +39,10 @@ $("#themeBtn").onclick = () => {
     document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   applyTheme(next);
 };
-applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+
+applyTheme(
+  document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+);
 
 function toast(msg) {
   const t = $("#toast");
@@ -46,6 +51,7 @@ function toast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(() => (t.hidden = true), 3500);
 }
+
 function esc(t) {
   const d = document.createElement("div");
   d.textContent = t;
@@ -57,6 +63,7 @@ async function api(path, opts = {}) {
     ...opts,
     headers: {
       "Content-Type": "application/json",
+      ...opts.headers,
       ...(token ? { Authorization: "Bearer " + token } : {}),
     },
   });
@@ -73,7 +80,10 @@ async function api(path, opts = {}) {
 
 function render() {
   if (!projects.length) {
-    grid.innerHTML = '<p class="empty">لا توجد مشاريع بعد.</p>';
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "لا توجد مشاريع بعد.";
+    grid.replaceChildren(empty);
     return;
   }
   grid.innerHTML = projects
@@ -89,7 +99,9 @@ function render() {
     </article>`,
     )
     .join("");
-  observeReveals(grid.querySelectorAll(".proj"));
+  const cards = grid.querySelectorAll(".proj");
+  cards.forEach((card) => card.classList.add("reveal"));
+  observeReveals(cards);
 }
 
 let revealObserver;
@@ -124,9 +136,13 @@ async function loadProjects() {
   try {
     projects = await api("/projects");
     render();
-  } catch (e) {
-    grid.innerHTML =
-      '<p class="empty">تعذّر تحميل المشاريع. تأكد من تشغيل السيرفر.</p>';
+  } catch (error) {
+    projects = [];
+    const message = document.createElement("p");
+    message.className = "empty";
+    message.textContent =
+      error.message || "تعذّر تحميل المشاريع. حاول تحديث الصفحة.";
+    grid.replaceChildren(message);
   }
 }
 
@@ -139,11 +155,63 @@ function setAdmin(on, t) {
       : sessionStorage.removeItem(TOKEN_KEY);
   } catch (e) {}
   $("#addBtn").hidden = !on;
+  $("#messagesBtn").hidden = !on;
+  if (!on) closeModal(login);
+  $("#contactInbox").hidden = !on;
+  $("#messagesBtn").setAttribute("aria-expanded", "false");
   $("#adminBtn").classList.toggle("on", on);
   $("#adminBtn").textContent = on ? "🔓" : "🔒";
   $("#adminBtn").title = on ? "خروج المدير" : "دخول المدير";
+  $("#adminBtn").setAttribute(
+    "aria-label",
+    on ? "تسجيل خروج المدير" : "دخول المدير",
+  );
   render();
 }
+
+function openModal(dialog, initialFocus) {
+  modalTrigger = document.activeElement;
+  activeModal = dialog;
+  dialog.hidden = false;
+  (initialFocus || dialog.querySelector("input, button"))?.focus();
+}
+
+function closeModal(dialog) {
+  if (dialog.hidden) return;
+  dialog.hidden = true;
+  if (activeModal === dialog) activeModal = null;
+  if (modalTrigger instanceof HTMLElement && modalTrigger.isConnected) {
+    modalTrigger.focus();
+  }
+}
+
+document.addEventListener("keydown", (event) => {
+  if (!activeModal) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    if (activeModal === modal) $("#cancel").click();
+    else closeModal(activeModal);
+    return;
+  }
+  if (event.key !== "Tab") return;
+
+  const focusable = [
+    ...activeModal.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ].filter((element) => !element.hidden);
+  if (!focusable.length) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 $("#adminBtn").onclick = () => {
   if (admin) {
@@ -152,39 +220,47 @@ $("#adminBtn").onclick = () => {
   }
   pwErr.hidden = true;
   pw.value = "";
-  login.hidden = false;
-  pw.focus();
+  openModal(login, pw);
 };
+
 $("#loginCancel").onclick = () => {
-  login.hidden = true;
+  closeModal(login);
 };
+
 login.onclick = (e) => {
-  if (e.target === login) login.hidden = true;
+  if (e.target === login) closeModal(login);
 };
+
 $("#loginForm").onsubmit = async (e) => {
   e.preventDefault();
+  const button = e.currentTarget.querySelector('[type="submit"]');
+  button.disabled = true;
   try {
     const { token: t } = await api("/login", {
       method: "POST",
       body: JSON.stringify({ password: pw.value }),
     });
-    login.hidden = true;
+    closeModal(login);
     setAdmin(true, t);
     toast("تم تسجيل الدخول");
   } catch (err) {
     pwErr.textContent = err.message;
     pwErr.hidden = false;
     pw.select();
+  } finally {
+    button.disabled = false;
   }
 };
 
 $("#addBtn").onclick = () => {
-  modal.hidden = false;
+  openModal(modal, form.querySelector('[name="title"]'));
 };
+
 $("#cancel").onclick = () => {
-  modal.hidden = true;
   form.reset();
+  closeModal(modal);
 };
+
 modal.onclick = (e) => {
   if (e.target === modal) $("#cancel").click();
 };
@@ -210,21 +286,33 @@ grid.onclick = async (e) => {
   }
 };
 
-// تصغير الصورة قبل الرفع
 function shrink(file) {
   return new Promise((res, rej) => {
+    if (!(file instanceof Blob)) {
+      rej(new Error("اختر صورة للمشروع أولًا."));
+      return;
+    }
     const img = new Image(),
       url = URL.createObjectURL(file);
     img.onload = () => {
-      const k = Math.min(1, 1200 / img.width),
-        c = document.createElement("canvas");
-      c.width = img.width * k;
-      c.height = img.height * k;
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      res(c.toDataURL("image/jpeg", 0.82));
+      try {
+        const k = Math.min(1, 1200 / img.width),
+          canvas = document.createElement("canvas");
+        canvas.width = img.width * k;
+        canvas.height = img.height * k;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("تعذّر تجهيز صورة المشروع.");
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        res(canvas.toDataURL("image/jpeg", 0.82));
+      } catch (error) {
+        rej(error);
+      }
     };
-    img.onerror = rej;
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      rej(new Error("تعذّر فتح الصورة. اختر صورة JPG أو PNG أو WebP."));
+    };
     img.src = url;
   });
 }
@@ -250,14 +338,153 @@ form.onsubmit = async (e) => {
     await loadProjects();
   } catch (err) {
     toast(err.message || "تعذّر رفع المشروع");
+  } finally {
+    btn.disabled = false;
   }
-  btn.disabled = false;
 };
 
-$("#menuBtn").onclick = () => $("#links").classList.toggle("open");
-$("#links").onclick = (e) => {
-  if (e.target.tagName === "A") $("#links").classList.remove("open");
+const messagesBtn = $("#messagesBtn");
+const contactInbox = $("#contactInbox");
+const contactMessages = $("#contactMessages");
+
+async function loadContactMessages() {
+  contactMessages.setAttribute("aria-busy", "true");
+  try {
+    const messages = await api("/contact");
+    contactMessages.replaceChildren();
+    if (!messages.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "لا توجد رسائل حتى الآن.";
+      contactMessages.append(empty);
+      return;
+    }
+
+    messages.forEach((message) => {
+      const card = document.createElement("article");
+      card.className = "message-card";
+
+      const heading = document.createElement("div");
+      heading.className = "message-heading";
+      const sender = document.createElement("h4");
+      sender.textContent = message.name;
+      const date = document.createElement("time");
+      date.dateTime = message.createdAt;
+      date.textContent = new Date(message.createdAt).toLocaleString("ar-EG");
+      heading.append(sender, date);
+
+      const email = document.createElement("a");
+      email.href = `mailto:${encodeURIComponent(message.email)}`;
+      email.textContent = message.email;
+      email.dir = "ltr";
+
+      const details = document.createElement("p");
+      details.textContent = [message.service, message.phone]
+        .filter(Boolean)
+        .join(" · ");
+
+      const content = document.createElement("p");
+      content.textContent = message.message;
+
+      card.append(heading, email);
+      if (details.textContent) card.append(details);
+      card.append(content);
+      contactMessages.append(card);
+    });
+  } catch (error) {
+    const message = document.createElement("p");
+    message.className = "empty";
+    message.textContent = error.message || "تعذّر تحميل الرسائل.";
+    contactMessages.replaceChildren(message);
+  } finally {
+    contactMessages.setAttribute("aria-busy", "false");
+  }
+}
+
+messagesBtn.onclick = async () => {
+  const isOpening = contactInbox.hidden;
+  contactInbox.hidden = !isOpening;
+  messagesBtn.setAttribute("aria-expanded", String(isOpening));
+  if (isOpening) await loadContactMessages();
 };
+
+$("#refreshMessages").onclick = loadContactMessages;
+
+const contactForm = $("#contactForm");
+if (contactForm) {
+  contactForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitButton = contactForm.querySelector('[type="submit"]');
+    const originalLabel = submitButton.textContent;
+    const data = new FormData(contactForm);
+    const payload = {
+      name: String(data.get("name") || "").trim(),
+      email: String(data.get("email") || "").trim(),
+      phone: String(data.get("phone") || "").trim(),
+      service: String(data.get("service") || "").trim(),
+      message: String(data.get("message") || "").trim(),
+    };
+    submitButton.disabled = true;
+    submitButton.textContent = "جارٍ الإرسال…";
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(json.error || "تعذّر إرسال الرسالة.");
+      }
+      toast("تم إرسال رسالتك بنجاح. سنعاود التواصل معك قريبًا.");
+      contactForm.reset();
+      if (admin && !contactInbox.hidden) await loadContactMessages();
+    } catch (error) {
+      toast(error.message || "حدث خطأ أثناء الإرسال.");
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = originalLabel;
+    }
+  });
+}
+
+const menuButton = $("#menuBtn");
+const links = $("#links");
+function closeMenu() {
+  links.classList.remove("open");
+  menuButton.setAttribute("aria-expanded", "false");
+  menuButton.setAttribute("aria-label", "فتح القائمة");
+}
+menuButton.onclick = () => {
+  const isOpening = !links.classList.contains("open");
+  links.classList.toggle("open", isOpening);
+  menuButton.setAttribute("aria-expanded", String(isOpening));
+  menuButton.setAttribute(
+    "aria-label",
+    isOpening ? "إغلاق القائمة" : "فتح القائمة",
+  );
+};
+$("#links").onclick = (e) => {
+  if (e.target.closest("a")) closeMenu();
+};
+document.addEventListener("click", (event) => {
+  if (
+    links.classList.contains("open") &&
+    !links.contains(event.target) &&
+    !menuButton.contains(event.target)
+  ) {
+    closeMenu();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && links.classList.contains("open")) {
+    closeMenu();
+    menuButton.focus();
+  }
+});
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 720) closeMenu();
+});
 
 $(".phone").onclick = (e) => {
   if (matchMedia("(pointer:coarse)").matches) return;
@@ -275,3 +502,8 @@ $(".phone").onclick = (e) => {
 setAdmin(admin, token);
 observeReveals();
 loadProjects();
+if (admin) {
+  api("/contact").catch((error) => {
+    if (token) console.error("تعذّر التحقق من جلسة المدير:", error);
+  });
+}

@@ -34,7 +34,7 @@
           ><img class="mark-img" src="images/logo-mark.png" alt="" />Web Craft
           Studio</a
         >
-        <nav class="links" id="links">
+        <nav class="links" id="links" aria-label="التنقل الرئيسي">
           <a href="#about">من نحن</a><a href="#services">الخدمات</a
           ><a href="#quadtree">عرض 3D</a><a href="#projects">المشاريع</a
           ><a href="#contact">تواصل</a>
@@ -56,7 +56,14 @@
         >
           🔒
         </button>
-        <button class="icon-btn menu" id="menuBtn" aria-label="القائمة">
+        <button
+          class="icon-btn menu"
+          id="menuBtn"
+          type="button"
+          aria-label="فتح القائمة"
+          aria-controls="links"
+          aria-expanded="false"
+        >
           ☰
         </button>
       </div>
@@ -95,7 +102,12 @@
               role="img"
               aria-label="مشهد متحرك يبدأ بشبكة هندسية ثم يتحول إلى حروف AV1 ثلاثية الأبعاد"
             ></canvas>
-            <canvas id="quadtreeCanvas3d" width="1280" height="720" aria-hidden="true"></canvas>
+            <canvas
+              id="quadtreeCanvas3d"
+              width="1280"
+              height="720"
+              aria-hidden="true"
+            ></canvas>
             <div class="quadtree-stage-label" aria-hidden="true">
               <span class="stage-dot"></span>
               QUADTREE → 3D
@@ -103,7 +115,11 @@
           </div>
           <div class="quadtree-controls">
             <span>تحريك تلقائي للمشهد</span>
-            <button class="btn small quadtree-replay" id="quadtreeReplay" type="button">
+            <button
+              class="btn small quadtree-replay"
+              id="quadtreeReplay"
+              type="button"
+            >
               <span aria-hidden="true">↻</span>
               إعادة العرض
             </button>
@@ -164,31 +180,120 @@
 
       <section id="contact" class="section alt">
         <div class="container">
-          <h2>تواصل معنا</h2>
-          <div class="grid">
-            <a
-              class="card contact"
-              href="https://www.facebook.com/profile.php?id=61594662582257"
-              target="_blank"
-              rel="noopener"
-              ><span class="ico">📘</span>
-              <h3>فيسبوك</h3>
-              <p>Web Craft Studio</p></a
+          <div class="row contact-heading">
+            <h2>تواصل معنا</h2>
+            <button
+              class="btn small"
+              id="messagesBtn"
+              type="button"
+              aria-controls="contactInbox"
+              aria-expanded="false"
+              hidden
             >
-            <a class="card contact phone" href="tel:+201024370764"
-              ><span class="ico">📞</span>
-              <h3>الهاتف</h3>
-              <p dir="ltr">01024370764</p></a
-            >
-            <a
-              class="card contact wa"
-              href="https://wa.me/201024370764"
-              target="_blank"
-              rel="noopener"
-              ><span class="ico">💬</span>
-              <h3>واتساب</h3>
-              <p dir="ltr">01024370764</p></a
-            >
+              رسائل العملاء
+            </button>
+          </div>
+          <section
+            class="contact-inbox"
+            id="contactInbox"
+            aria-labelledby="contactInboxTitle"
+            hidden
+          >
+            <div class="row">
+              <h3 id="contactInboxTitle">رسائل العملاء</h3>
+              <button
+                class="btn small ghost dark"
+                id="refreshMessages"
+                type="button"
+              >
+                تحديث الرسائل
+              </button>
+            </div>
+            <div
+              class="message-list"
+              id="contactMessages"
+              aria-live="polite"
+              aria-busy="false"
+            ></div>
+          </section>
+          <div class="contact-layout">
+            <div class="grid">
+              <a
+                class="card contact"
+                href="https://www.facebook.com/profile.php?id=61594662582257"
+                target="_blank"
+                rel="noopener"
+                ><span class="ico">📘</span>
+                <h3>فيسبوك</h3>
+                <p>Web Craft Studio</p></a
+              >
+              <a class="card contact phone" href="tel:+201024370764"
+                ><span class="ico">📞</span>
+                <h3>الهاتف</h3>
+                <p dir="ltr">01024370764</p></a
+              >
+              <a
+                class="card contact wa"
+                href="https://wa.me/201024370764"
+                target="_blank"
+                rel="noopener"
+                ><span class="ico">💬</span>
+                <h3>واتساب</h3>
+                <p dir="ltr">01024370764</p></a
+              >
+            </div>
+
+            <form class="contact-form" id="contactForm">
+              <h3>أرسل رسالة</h3>
+              <label>
+                الاسم
+                <input
+                  type="text"
+                  name="name"
+                  autocomplete="name"
+                  maxlength="60"
+                  required
+                />
+              </label>
+              <label>
+                البريد الإلكتروني
+                <input
+                  type="email"
+                  name="email"
+                  autocomplete="email"
+                  maxlength="120"
+                  required
+                />
+              </label>
+              <label>
+                الهاتف (اختياري)
+                <input
+                  type="tel"
+                  name="phone"
+                  autocomplete="tel"
+                  maxlength="30"
+                />
+              </label>
+              <label>
+                الخدمة المطلوبة
+                <input
+                  type="text"
+                  name="service"
+                  maxlength="60"
+                  placeholder="مثال: موقع متجر، موقع شركة..."
+                />
+              </label>
+              <label>
+                الرسالة
+                <textarea
+                  name="message"
+                  required
+                  maxlength="1000"
+                  rows="5"
+                ></textarea>
+              </label>
+              <button type="submit" class="btn small">إرسال الرسالة</button>
+            </form>
           </div>
         </div>
       </section>
@@ -198,9 +303,16 @@
       <div class="container">© 2026 Web Craft Studio. جميع الحقوق محفوظة.</div>
     </footer>
 
-    <div class="modal" id="modal" hidden>
+    <div
+      class="modal"
+      id="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="addProjectTitle"
+      hidden
+    >
       <form class="box" id="form">
-        <h3>إضافة مشروع جديد</h3>
+        <h3 id="addProjectTitle">إضافة مشروع جديد</h3>
         <label
           >عنوان المشروع<input name="title" required maxlength="60"
         /></label>
@@ -220,7 +332,11 @@
             placeholder="https://"
         /></label>
         <label
-          >صورة المشروع<input name="img" type="file" accept="image/*" required
+          >صورة المشروع<input
+            name="img"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            required
         /></label>
         <div class="row">
           <button class="btn small" type="submit">حفظ</button
@@ -230,9 +346,16 @@
         </div>
       </form>
     </div>
-    <div class="modal" id="login" hidden>
+    <div
+      class="modal"
+      id="login"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="loginTitle"
+      hidden
+    >
       <form class="box" id="loginForm">
-        <h3>دخول المدير</h3>
+        <h3 id="loginTitle">دخول المدير</h3>
         <label
           >كلمة المرور<input
             type="password"
@@ -249,7 +372,7 @@
         </div>
       </form>
     </div>
-    <div class="toast" id="toast" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <script src="script.js"></script>
     <script src="quadtree.js"></script>
   </body>
