@@ -1,4 +1,5 @@
 "use strict";
+// النسخة المرتبطة بالـ Backend: المشاريع وتسجيل الدخول عبر /api
 const TOKEN_KEY = "wcs_token";
 const THEME_KEY = "wcs_theme";
 const $ = (s) => document.querySelector(s);
@@ -7,11 +8,7 @@ const grid = $("#projectGrid"),
   form = $("#form");
 const login = $("#login"),
   pw = $("#pw"),
-  pwErr = $("#pwErr"),
-  projectSearch = $("#projectSearch"),
-  projectStatusFilter = $("#projectStatusFilter"),
-  projectCategoryFilter = $("#projectCategoryFilter"),
-  clearFiltersBtn = $("#clearFilters");
+  pwErr = $("#pwErr");
 let token = null,
   projects = [],
   activeModal = null,
@@ -81,13 +78,6 @@ async function api(path, opts = {}) {
   return data;
 }
 
-function projectMeta(project) {
-  const statusLabel = project.status === "draft" ? "مسودة" : "منشور";
-  return `
-    ${admin ? `<div class="meta-row"><span class="status-badge ${project.status}">${statusLabel}</span><span class="category-badge">${esc(project.category || "عام")}</span></div>` : ""}
-  `;
-}
-
 function render() {
   if (!projects.length) {
     const empty = document.createElement("p");
@@ -102,8 +92,7 @@ function render() {
     <article class="card proj">
       <div class="wrap"><div class="thumb" style="background-image:${p.img.startsWith("linear") ? p.img : `url(${encodeURI(p.img)})`}"></div></div>
       <div class="body">
-        ${admin && !p.seed ? `<div class="admin-actions"><button class="edit" data-id="${esc(p.id)}" title="تعديل" aria-label="تعديل المشروع">✎</button><button class="del" data-id="${esc(p.id)}" title="حذف" aria-label="حذف المشروع">🗑</button></div>` : ""}
-        ${projectMeta(p)}
+        ${admin && !p.seed ? `<button class="del" data-id="${esc(p.id)}" title="حذف" aria-label="حذف المشروع">🗑</button>` : ""}
         <h3>${esc(p.title)}</h3><p>${esc(p.desc)}</p>
         ${p.url ? `<a class="visit" href="${esc(p.url)}" target="_blank" rel="noopener">زيارة المشروع</a>` : ""}
       </div>
@@ -143,33 +132,9 @@ function observeReveals(elements) {
   elements.forEach((element) => revealObserver.observe(element));
 }
 
-function buildProjectQuery() {
-  const params = new URLSearchParams();
-  const search = projectSearch ? projectSearch.value.trim() : "";
-  const status = projectStatusFilter ? projectStatusFilter.value : "all";
-  const category = projectCategoryFilter ? projectCategoryFilter.value : "all";
-  if (search) params.set("search", search);
-  if (status && status !== "all") params.set("status", status);
-  if (category && category !== "all") params.set("category", category);
-  params.set("page", "1");
-  params.set("limit", "12");
-  return params;
-}
-
 async function loadProjects() {
   try {
-    const params = buildProjectQuery();
-    const data = await api(`/projects?${params.toString()}`);
-    const payload = Array.isArray(data) ? { projects: data } : data;
-    projects = payload.projects || [];
-    const categories = [...new Set(projects.map((p) => p.category).filter(Boolean))];
-    if (projectCategoryFilter) {
-      const current = projectCategoryFilter.value;
-      projectCategoryFilter.innerHTML = `<option value="all">كل التصنيفات</option>${categories
-        .map((c) => `<option value="${esc(c)}">${esc(c)}</option>`)
-        .join("")}`;
-      projectCategoryFilter.value = categories.includes(current) ? current : "all";
-    }
+    projects = await api("/projects");
     render();
   } catch (error) {
     projects = [];
@@ -192,12 +157,11 @@ function setAdmin(on, t) {
   $("#addBtn").hidden = !on;
   $("#messagesBtn").hidden = !on;
   if (!on) closeModal(login);
-  $("#contactInbox").hidden = !on;
+  $("#contactInbox").hidden = true; // يُفتح بزر "رسائل العملاء"
   $("#messagesBtn").setAttribute("aria-expanded", "false");
   $("#adminBtn").classList.toggle("on", on);
   $("#adminBtn").textContent = on ? "🔓" : "🔒";
   $("#adminBtn").title = on ? "خروج المدير" : "دخول المدير";
-<<<<<<< HEAD
   $("#adminBtn").setAttribute(
     "aria-label",
     on ? "تسجيل خروج المدير" : "دخول المدير",
@@ -250,16 +214,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 $("#adminBtn").onclick = () => {
-=======
-  loadProjects();
-}
-
-$("#adminBtn").onclick = async () => {
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
   if (admin) {
-    try {
-      await api("/logout", { method: "POST" });
-    } catch (err) {}
     setAdmin(false);
     return toast("تم تسجيل الخروج");
   }
@@ -276,122 +231,54 @@ login.onclick = (e) => {
   if (e.target === login) closeModal(login);
 };
 
-<<<<<<< HEAD
 $("#loginForm").onsubmit = async (e) => {
   e.preventDefault();
   const button = e.currentTarget.querySelector('[type="submit"]');
   button.disabled = true;
-=======
-// [التعديل هنا] تحديث دالة تسجيل الدخول لإخفاء النافذة فوراً وتطبيق صلاحيات المدير
-$("#loginForm").onsubmit = async (e) => {
-  e.preventDefault();
-  const submitBtn = e.target.querySelector("[type=submit]");
-  submitBtn.disabled = true;
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
   try {
     const { token: t } = await api("/login", {
       method: "POST",
       body: JSON.stringify({ password: pw.value }),
     });
-<<<<<<< HEAD
     closeModal(login);
-=======
-    login.hidden = true;
-    pw.value = "";
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
     setAdmin(true, t);
-    toast("تم تسجيل الدخول بنجاح");
+    toast("تم تسجيل الدخول");
   } catch (err) {
-    pwErr.textContent = err.message || "كلمة المرور غير صحيحة";
+    pwErr.textContent = err.message;
     pwErr.hidden = false;
     pw.select();
   } finally {
-<<<<<<< HEAD
     button.disabled = false;
   }
 };
 
 $("#addBtn").onclick = () => {
   openModal(modal, form.querySelector('[name="title"]'));
-=======
-    submitBtn.disabled = false;
-  }
-};
-
-function resetProjectForm() {
-  form.reset();
-  form.querySelector('[name="id"]').value = "";
-  form.querySelector('[name="status"]').value = "published";
-  form.querySelector('[name="order"]').value = "0";
-}
-
-function openProjectModal(project) {
-  modal.hidden = false;
-  form.querySelector('[name="id"]').value = project ? project.id : "";
-  form.querySelector('[name="title"]').value = project ? project.title : "";
-  form.querySelector('[name="desc"]').value = project ? project.desc : "";
-  form.querySelector('[name="url"]').value = project ? project.url || "" : "";
-  form.querySelector('[name="category"]').value = project ? project.category || "عام" : "عام";
-  form.querySelector('[name="status"]').value = project ? project.status : "published";
-  form.querySelector('[name="order"]').value = project ? project.order || 0 : 0;
-  const fileField = form.querySelector('[name="img"]');
-  fileField.required = !project;
-}
-
-$("#addBtn").onclick = () => {
-  openProjectModal(null);
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
 };
 
 $("#cancel").onclick = () => {
-<<<<<<< HEAD
   form.reset();
   closeModal(modal);
-=======
-  modal.hidden = true;
-  resetProjectForm();
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
 };
 
 modal.onclick = (e) => {
   if (e.target === modal) $("#cancel").click();
 };
 
-function getProjectFormValues() {
-  const formData = new FormData(form);
-  return {
-    id: formData.get("id") || "",
-    title: String(formData.get("title") || "").trim(),
-    desc: String(formData.get("desc") || "").trim(),
-    url: String(formData.get("url") || "").trim(),
-    status: String(formData.get("status") || "published"),
-    category: String(formData.get("category") || "عام").trim() || "عام",
-    order: Number(formData.get("order") || 0),
-    image: formData.get("img") || null,
-  };
-}
-
 grid.onclick = async (e) => {
-  const editBtn = e.target.closest(".edit");
-  if (editBtn) {
-    const project = projects.find((item) => item.id === editBtn.dataset.id);
-    if (project) openProjectModal(project);
-    return;
-  }
-
-  const delBtn = e.target.closest(".del");
-  if (!delBtn) return;
-  if (!delBtn.classList.contains("sure")) {
-    delBtn.classList.add("sure");
-    delBtn.textContent = "تأكيد الحذف";
+  const b = e.target.closest(".del");
+  if (!b) return;
+  if (!b.classList.contains("sure")) {
+    b.classList.add("sure");
+    b.textContent = "تأكيد الحذف";
     setTimeout(() => {
-      delBtn.classList.remove("sure");
-      delBtn.textContent = "🗑";
+      b.classList.remove("sure");
+      b.textContent = "🗑";
     }, 3000);
     return;
   }
   try {
-    await api("/projects/" + delBtn.dataset.id, { method: "DELETE" });
+    await api("/projects/" + b.dataset.id, { method: "DELETE" });
     toast("تم حذف المشروع");
     await loadProjects();
   } catch (err) {
@@ -432,43 +319,27 @@ function shrink(file) {
 
 form.onsubmit = async (e) => {
   e.preventDefault();
-  const values = getProjectFormValues();
-  const btn = form.querySelector("[type=submit]");
+  const f = new FormData(form),
+    btn = form.querySelector("[type=submit]");
   btn.disabled = true;
   try {
-    const payload = {
-      title: values.title,
-      desc: values.desc,
-      url: values.url,
-      status: values.status,
-      category: values.category,
-      order: values.order,
-    };
-
-    if (values.image && values.image.size > 0) {
-      payload.image = await shrink(values.image);
-    }
-
-    const isEdit = Boolean(values.id);
-    const endpoint = isEdit ? `/projects/${values.id}` : "/projects";
-    const method = isEdit ? "PUT" : "POST";
-
-    await api(endpoint, {
-      method,
-      body: JSON.stringify(payload),
+    const image = await shrink(f.get("img"));
+    await api("/projects", {
+      method: "POST",
+      body: JSON.stringify({
+        title: f.get("title"),
+        desc: f.get("desc"),
+        url: f.get("url"),
+        image,
+      }),
     });
-
     $("#cancel").click();
-    toast(isEdit ? "تم تحديث المشروع" : "تمت إضافة المشروع");
+    toast("تمت إضافة المشروع");
     await loadProjects();
   } catch (err) {
-<<<<<<< HEAD
     toast(err.message || "تعذّر رفع المشروع");
   } finally {
     btn.disabled = false;
-=======
-    toast(err.message || "تعذّر حفظ المشروع");
->>>>>>> 463cc31e2cbad20a55fdce6b3356f783e9169724
   }
 };
 
@@ -503,7 +374,7 @@ async function loadContactMessages() {
       heading.append(sender, date);
 
       const email = document.createElement("a");
-      email.href = `mailto:${encodeURIComponent(message.email)}`;
+      email.href = "mailto:" + message.email;
       email.textContent = message.email;
       email.dir = "ltr";
 
@@ -539,6 +410,23 @@ messagesBtn.onclick = async () => {
 
 $("#refreshMessages").onclick = loadContactMessages;
 
+const WA_NUMBER = "201024370764";
+function sendViaWhatsApp(d) {
+  const lines = [
+    "رسالة جديدة من موقع Web Craft Studio",
+    "الاسم: " + d.name,
+    "البريد: " + d.email,
+    d.phone && "الهاتف: " + d.phone,
+    d.service && "الخدمة: " + d.service,
+    "الرسالة: " + d.message,
+  ].filter(Boolean);
+  const url = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(lines.join("\n"));
+  toast("سيتم فتح واتساب لإرسال رسالتك، اضغط إرسال هناك.");
+  const w = window.open(url, "_blank");
+  if (w) w.opener = null;
+  else location.href = url; // لو حجب المتصفح النافذة الجديدة
+}
+
 const contactForm = $("#contactForm");
 if (contactForm) {
   contactForm.addEventListener("submit", async (event) => {
@@ -562,6 +450,12 @@ if (contactForm) {
         body: JSON.stringify(payload),
       });
       const json = await response.json().catch(() => ({}));
+      if (response.status === 503) {
+        // قاعدة البيانات غير مُعدّة (مثلًا على Vercel بدون MongoDB): نرسل الرسالة عبر واتساب بدل ضياعها.
+        sendViaWhatsApp(payload);
+        contactForm.reset();
+        return;
+      }
       if (!response.ok) {
         throw new Error(json.error || "تعذّر إرسال الرسالة.");
       }
@@ -627,30 +521,6 @@ $(".phone").onclick = (e) => {
     () => toast("رقم الهاتف: " + n),
   );
 };
-
-if (projectSearch) {
-  projectSearch.addEventListener("input", () => {
-    loadProjects();
-  });
-}
-if (projectStatusFilter) {
-  projectStatusFilter.addEventListener("change", () => {
-    loadProjects();
-  });
-}
-if (projectCategoryFilter) {
-  projectCategoryFilter.addEventListener("change", () => {
-    loadProjects();
-  });
-}
-if (clearFiltersBtn) {
-  clearFiltersBtn.addEventListener("click", () => {
-    if (projectSearch) projectSearch.value = "";
-    if (projectStatusFilter) projectStatusFilter.value = "all";
-    if (projectCategoryFilter) projectCategoryFilter.value = "all";
-    loadProjects();
-  });
-}
 
 setAdmin(admin, token);
 observeReveals();
