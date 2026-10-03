@@ -2,9 +2,9 @@
   "name": "web-craft-studio",
   "version": "1.0.0",
   "description": "Web Craft Studio - موقع مع Backend بسيط (Node.js + MongoDB + Cloudinary)",
-  "main": "server.js",
+  "main": "proj/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node proj/server.js"
   },
   "engines": {
     "node": ">=18"
