@@ -838,6 +838,53 @@ h2::after {
   padding: 0.8rem 0.9rem;
   font: inherit;
 }
+.contant-section,
+.contact-text {
+  color: #000000;
+}
+
+[data-theme="dark"] .contact-section,
+[data-theme="dark"] .contact-text {
+  color: #ffffff;
+}
+
+.contact-form label {
+  color: #000000;
+}
+
+[data-theme="dark"] .contact-form label {
+  color: #ffffff;
+}
+
+.contact-form h3 {
+  color: #000000;
+}
+
+[data-theme="dark"] .contact-form h3 {
+  color: #ffffff;
+}
+
+.contact-form input,
+.contact-form textarea {
+  background: #e8f1ff;
+  border: 1px solid #b6cdf5;
+  color: #000000;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="dark"] .contact-form input,
+[data-theme="dark"] .contact-form textarea {
+  background: #1c2a4a;
+  border: 1px solid #2f4478;
+  color: #ffffff;
+}
+
 .contact-form textarea {
   min-height: 10rem;
   resize: vertical;

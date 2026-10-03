@@ -88,6 +88,9 @@ if (useMongo && hasCloudinary) {
 const PASSWORD = process.env.ADMIN_PASSWORD;
 if (!PASSWORD)
   console.warn("⚠ دخول المدير معطّل: اضبط ADMIN_PASSWORD في متغيرات البيئة.");
+  console.log("ADMIN_PASSWORD set?" !!process.env.ADMIN_PASSWORD);
+  
+
 
 // On serverless, keep a fallback secret in memory; configure SECRET to keep
 // login tokens valid across separate function instances.
