@@ -588,3 +588,32 @@ if (require.main === module) {
       console.log("Web Craft Studio: http://localhost:" + PORT),
     );
 }
+const SEED = [
+  {
+    id: "town-burger-plus",
+    title: "Town Burger+ | منيو تفاعلي وموقع مطعم",
+    desc: "منصة منيو تفاعلية ذات أداء فائق مبنية بـ Next.js و TailWind CSS مع نظام اختيار الوجبات والتواصل المباشر عبر الواتساب.",
+    img: "https://town-burger-plus.vercel.app/menu-mixed-platter-alt.png",
+    url: "https://town-burger-plus.vercel.app/",
+    category: "تطبيق ويب",
+    seed: true
+  },
+  {
+    id: "rakeeza-landing",
+    title: "ركيزة | منصة حلول البرمجيات",
+    desc: "صفحة هبوط تعريفية احترافية للحلول التقنية والشركات مع دعم كامل للاتش تيمل والواجهات التفاعلية بـ React.js.",
+    img: "linear-gradient(135deg, #0f1733, #2f7bff)",
+    url: "#",
+    category: "موقع شركة",
+    seed: true
+  },
+  {
+    id: "dentanova-clinic",
+    title: "دنتانوفا | عيادة طب الأسنان",
+    desc: "واجهة تعريفية عصرية لعيادة أسنان تعرض الخدمات، الفريق الطبي، وحجز المواعيد المباشر.",
+    img: "linear-gradient(135deg, #7a5cff, #2f7bff)",
+    url: "#",
+    category: "صفحة هبوط",
+    seed: true
+  }
+];
