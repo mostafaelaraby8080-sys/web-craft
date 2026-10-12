@@ -588,8 +588,10 @@ if (require.main === module) {
       console.log("Web Craft Studio: http://localhost:" + PORT),
     );
 }
-module.exports = app;
+module.exports = requestHandler;
 
 if (require.main === module) {
-  app.listen(3000);
+  http.createServer(requestHandler).listen(PORT, () => {
+    console.log("Web Craft Studio: http://localhost:" + PORT);
+  });
 }
