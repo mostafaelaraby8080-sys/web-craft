@@ -1,6 +1,6 @@
-require('dotenv').config();
+require("dotenv").config();
 
-"use strict";
+("use strict");
 // Backend: Node.js + (اختياري) MongoDB و Cloudinary عند وجود المتغيرات.
 const http = require("http"),
   fs = require("fs"),
@@ -587,4 +587,9 @@ if (require.main === module) {
     .listen(PORT, () =>
       console.log("Web Craft Studio: http://localhost:" + PORT),
     );
+}
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(3000);
 }
