@@ -4,7 +4,7 @@
   "description": "Web Craft Studio - موقع مع Backend بسيط (Node.js + MongoDB + Cloudinary)",
   "main": "proj/server.js",
   "scripts": {
-    "start": "node proj/server.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
