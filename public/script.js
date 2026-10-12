@@ -660,3 +660,27 @@ if (admin) {
     if (token) console.error("تعذّر التحقق من جلسة المدير:", error);
   });
 }
+// في دالة التعامل مع submit نموذج التواصل
+async function handleContactSubmit(e) {
+  e.preventDefault();
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  
+  try {
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    await api("/contact", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+    
+    // إظهار التنبيه وإعادة ضبط الخانات
+    toast("✨ تم استلام رسالتك بنجاح! سنتواصل معك في أقرب وقت.");
+    form.reset();
+  } catch (err) {
+    toast("❌ " + (err.message || "حدث خطأ أثناء إرسال الرسالة."));
+  } finally {
+    submitBtn.disabled = false;
+  }
+}

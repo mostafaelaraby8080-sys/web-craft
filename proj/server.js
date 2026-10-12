@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 "use strict";
 // Backend: Node.js + (اختياري) MongoDB و Cloudinary عند وجود المتغيرات.
 const http = require("http"),
