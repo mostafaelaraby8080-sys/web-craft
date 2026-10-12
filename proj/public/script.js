@@ -420,7 +420,11 @@ function sendViaWhatsApp(d) {
     d.service && "الخدمة: " + d.service,
     "الرسالة: " + d.message,
   ].filter(Boolean);
-  const url = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(lines.join("\n"));
+  const url =
+    "https://wa.me/" +
+    WA_NUMBER +
+    "?text=" +
+    encodeURIComponent(lines.join("\n"));
   toast("سيتم فتح واتساب لإرسال رسالتك، اضغط إرسال هناك.");
   const w = window.open(url, "_blank");
   if (w) w.opener = null;
@@ -529,4 +533,28 @@ if (admin) {
   api("/contact").catch((error) => {
     if (token) console.error("تعذّر التحقق من جلسة المدير:", error);
   });
+}
+// في دالة التعامل مع submit نموذج التواصل
+async function handleContactSubmit(e) {
+  e.preventDefault();
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    await api("/contact", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+
+    // إظهار التنبيه وإعادة ضبط الخانات
+    toast("✨ تم استلام رسالتك بنجاح! سنتواصل معك في أقرب وقت.");
+    form.reset();
+  } catch (err) {
+    toast("❌ " + (err.message || "حدث خطأ أثناء إرسال الرسالة."));
+  } finally {
+    submitBtn.disabled = false;
+  }
 }
