@@ -1,9 +1,14 @@
 "use strict";
 // وكيل الدردشة (AI Agent) لموقع Webcraft Studio
-// يعمل عبر Claude API. يحتاج المتغير ANTHROPIC_API_KEY، ولو غير موجود
-// يرد الموقع بإجابات جاهزة من داخل المتصفح (chat.js) فلا يتعطل الشات أبدًا.
+// يدعم مزوّدين: Google Gemini (فيه طبقة مجانية) أو Claude (مدفوع).
+//  - لو وُجد GEMINI_API_KEY يستخدم Gemini أولًا.
+//  - وإلا لو وُجد ANTHROPIC_API_KEY يستخدم Claude.
+//  - لو لا مفتاح ولا رد (أو حصل خطأ) يرد الموقع بإجابات جاهزة من المتصفح (chat.js)،
+//    فلا يتعطل الشات أبدًا.
 
-const MODEL = () => process.env.CHAT_MODEL || "claude-haiku-5-5";
+const CLAUDE_MODEL = () => process.env.CHAT_MODEL || "claude-haiku-5-5";
+// اسم الموديل عند Google يتغير كثيرًا: لو ظهر خطأ 404 غيّر GEMINI_MODEL في Vercel
+const GEMINI_MODEL = () => process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
 
 // كل ما يعرفه المساعد عن الاستوديو. عدّل هذا النص ليعرف معلومات جديدة (أسعار، مدد…).
 const SYSTEM = `أنت "مساعد Webcraft Studio"، المساعد الذكي في موقع استوديو Webcraft Studio. مهمتك الرد على استفسارات الزوار، وشرح خدمات الاستوديو لهم، وإعطاؤهم معلومات عنه بأسلوب ودود وبسيط وواضح.
@@ -45,7 +50,8 @@ function allow(ip) {
   return true;
 }
 
-const enabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
+const enabled = () =>
+  Boolean(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY);
 
 // تنظيف المحادثة القادمة من المتصفح: آخر 12 رسالة، أدوار متبادلة، تبدأ وتنتهي برسالة زائر
 function clean(messages) {
@@ -63,7 +69,41 @@ function clean(messages) {
   return out;
 }
 
-async function reply(messages) {
+async function askGemini(messages) {
+  const url =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(GEMINI_MODEL()) +
+    ":generateContent";
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": process.env.GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+      generationConfig: { maxOutputTokens: 800, temperature: 0.6 },
+    }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!r.ok) {
+    const detail = (await r.text().catch(() => "")).slice(0, 300);
+    throw new Error("Gemini API " + r.status + " " + detail);
+  }
+  const data = await r.json();
+  const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+  return parts
+    .filter((x) => typeof x.text === "string" && !x.thought)
+    .map((x) => x.text)
+    .join("")
+    .trim();
+}
+
+async function askClaude(messages) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -72,20 +112,29 @@ async function reply(messages) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: MODEL(),
+      model: CLAUDE_MODEL(),
       max_tokens: 450,
       system: SYSTEM,
       messages,
     }),
     signal: AbortSignal.timeout(8000),
   });
-  if (!r.ok) throw new Error("Anthropic API " + r.status);
+  if (!r.ok) {
+    const detail = (await r.text().catch(() => "")).slice(0, 300);
+    throw new Error("Anthropic API " + r.status + " " + detail);
+  }
   const data = await r.json();
-  const text = (data.content || [])
+  return (data.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
+}
+
+async function reply(messages) {
+  const text = process.env.GEMINI_API_KEY
+    ? await askGemini(messages)
+    : await askClaude(messages);
   if (!text) throw new Error("empty reply");
   return text.slice(0, 1200);
 }
