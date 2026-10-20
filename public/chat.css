@@ -1,0 +1,274 @@
+/* المساعد الذكي (AI Agent) لموقع Webcraft Studio — يعتمد على متغيرات الألوان في style.css */
+.wc-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  box-shadow: 0 10px 28px rgba(47, 123, 255, 0.4);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.wc-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 14px 32px rgba(122, 92, 255, 0.5);
+}
+.wc-fab svg {
+  width: 28px;
+  height: 28px;
+}
+.wc-fab[hidden],
+.wc-panel[hidden],
+.wc-nudge[hidden] {
+  display: none !important;
+}
+.wc-nudge {
+  position: fixed;
+  right: 94px;
+  bottom: 34px;
+  z-index: 100;
+  padding: 0.45rem 0.9rem;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(127, 142, 170, 0.2);
+  animation: rise 0.4s ease both;
+}
+.wc-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 101;
+  width: min(380px, calc(100vw - 32px));
+  height: min(560px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid rgba(127, 142, 170, 0.22);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  animation: rise 0.3s ease both;
+}
+.wc-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+}
+.wc-av {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+.wc-av svg {
+  width: 22px;
+  height: 22px;
+}
+.wc-ht {
+  display: grid;
+  line-height: 1.35;
+  margin-inline-end: auto;
+}
+.wc-ht small {
+  opacity: 0.85;
+  font-size: 0.75rem;
+}
+.wc-x {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+}
+.wc-x:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.wc-x svg {
+  width: 16px;
+  height: 16px;
+}
+.wc-log {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem;
+  overscroll-behavior: contain;
+  background: var(--bg);
+}
+.wc-msg {
+  max-width: 85%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 16px;
+  font-size: 0.93rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: rise 0.25s ease both;
+}
+.wc-msg.bot {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid rgba(127, 142, 170, 0.2);
+  border-start-start-radius: 4px;
+}
+.wc-msg.me {
+  align-self: flex-end;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  border-start-end-radius: 4px;
+}
+.wc-typing {
+  display: flex;
+  gap: 5px;
+  padding: 0.85rem 1rem;
+}
+.wc-typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: wc-dot 1s infinite ease-in-out;
+}
+.wc-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.wc-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes wc-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+.wc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.2rem 1rem 0.8rem;
+  background: var(--bg);
+}
+.wc-chips[hidden] {
+  display: none;
+}
+.wc-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid rgba(127, 142, 170, 0.35);
+  transition: 0.2s;
+}
+.wc-chip:hover {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+}
+.wc-form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border-top: 1px solid rgba(127, 142, 170, 0.2);
+  background: var(--card);
+}
+.wc-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.93rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--text);
+  background: var(--field-bg);
+  border: 1px solid rgba(127, 142, 170, 0.3);
+  border-radius: 12px;
+}
+.wc-form input:focus {
+  outline: 2px solid var(--brand);
+  border-color: transparent;
+}
+.wc-send {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+}
+.wc-send svg {
+  width: 20px;
+  height: 20px;
+  transform: scaleX(-1);
+}
+.wc-send:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.wc-foot {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--card);
+}
+.wc-foot a {
+  color: var(--brand);
+  font-weight: 700;
+}
+@media (max-width: 520px) {
+  .wc-fab {
+    right: 16px;
+    bottom: 16px;
+  }
+  .wc-nudge {
+    right: 84px;
+    bottom: 26px;
+  }
+  .wc-panel {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(82dvh, 620px);
+    border-radius: 20px 20px 0 0;
+  }
+}

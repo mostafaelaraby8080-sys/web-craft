@@ -7,6 +7,7 @@ const http = require("http"),
   path = require("path"),
   crypto = require("crypto"),
   os = require("os");
+const chatAgent = require("./chat-agent");
 
 // تحميل ملف .env محليًا (بدون مكتبات). المتغيرات الموجودة فعلًا لا تُستبدل.
 try {
@@ -476,6 +477,25 @@ async function api(req, res, url) {
     });
 
     return send(res, 201, { ok: true });
+  }
+
+  // ---- وكيل الدردشة (AI Agent)
+  if (req.method === "POST" && p === "/api/chat") {
+    const b = await body(req, 16e3);
+    const messages = chatAgent.clean(b.messages);
+    if (!messages) return send(res, 400, { error: "اكتب رسالتك أولًا." });
+    if (!chatAgent.enabled()) return send(res, 200, { fallback: true });
+    if (!chatAgent.allow(ipOf(req))) {
+      return send(res, 429, {
+        error: "الرسائل كترت شوية. جرّب بعد دقائق أو كلّمنا على واتساب.",
+      });
+    }
+    try {
+      return send(res, 200, { reply: await chatAgent.reply(messages) });
+    } catch (e) {
+      console.error("Webcraft Studio chat failed:", e.message);
+      return send(res, 200, { fallback: true });
+    }
   }
 
   if (req.method === "POST" && p === "/api/login") {

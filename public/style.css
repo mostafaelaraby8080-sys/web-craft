@@ -985,51 +985,35 @@ h2::after {
   }
 }
 
-/* ============ أيقونات التواصل بشكل البراند الحقيقي ============ */
-.contact .ico svg {
-  width: 28px;
-  height: 28px;
-  fill: currentColor;
+/* ============ أيقونات التواصل: أيقونات فقط تحت الرسائل ============ */
+.contact-layout {
+  grid-template-columns: 1fr;
 }
-.contact .card p,
-.contact p {
-  overflow-wrap: anywhere;
+.contact-form {
+  width: min(100%, 720px);
+  margin-inline: auto;
 }
-.ico.b-fb {
-  background: #1877f2;
-  color: #fff;
+.social-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.2rem, 4vw, 2.2rem);
+  margin-top: 2.2rem;
 }
-.ico.b-wa {
-  background: #25d366;
-  color: #fff;
+.social-row a {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  transition:
+    transform 0.25s ease,
+    filter 0.25s ease;
 }
-.ico.b-ig {
-  background: radial-gradient(
-    circle at 30% 107%,
-    #fdf497 0%,
-    #fdf497 5%,
-    #fd5949 45%,
-    #d6249f 60%,
-    #285aeb 90%
-  );
-  color: #fff;
+.social-row a:hover {
+  transform: translateY(-4px) scale(1.12);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
 }
-.ico.b-ln {
-  background: #0a66c2;
-  color: #fff;
-}
-.ico.b-gh {
-  background: #181717;
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-}
-.ico.b-ph {
-  color: var(--brand);
-}
-.ico.b-ph svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.social-row svg {
+  width: 100%;
+  height: 100%;
 }
